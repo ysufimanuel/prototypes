@@ -938,7 +938,8 @@ async function loadAllDataFromFirestore() {
             pengeluaran: pengeluaran || [],
             financeCategories: financeCategories || [],
             finance: financeConfig || { saldoAwal: 0 },
-            approvalHistory: approvalHistory || []
+            approvalHistory: approvalHistory || [],
+            activities: []
         };
     } catch (error) {
         console.error('[APP] Error loading data from Firestore:', error);
@@ -2030,6 +2031,7 @@ function saveDonation(e) {
 
         const donor = data.members.find(m => m.id === donationData.donorId);
         const tipeDisplay = donationTipe === 'lainnya' && customType ? customType : donationTipe;
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'donation',
@@ -2314,6 +2316,7 @@ function saveEvent(e) {
         const newId = Math.max(...data.events.map(ev => ev.id), 0) + 1;
         data.events.push({ id: newId, ...eventData, participants: [] });
 
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'event',
@@ -3032,6 +3035,7 @@ async function saveMember(e) {
             await window.setDocument(window.DB_COLLECTIONS.MEMBERS, String(newId), newMember);
         }
 
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'member',
@@ -5391,10 +5395,7 @@ function showFinanceTab(tabName, clickedBtn) {
 
     // Update tab content
     document.querySelectorAll('.finance-tab-content').forEach(content => content.classList.remove('active'));
-    const targetContent = document.getElementById('finance-' + tabName);
-    if (targetContent) {
-        targetContent.classList.add('active');
-    }
+    document.getElementById('finance-' + tabName).classList.add('active');
 
     // Refresh content based on tab
     if (tabName === 'dashboard') {
@@ -6817,17 +6818,3 @@ window.saveDeathData = saveDeathData;
 window.backupData = backupData;
 window.restoreData = restoreData;
 window.clearAllData = clearAllData;
-
-// ============================================================
-// FUNGSI SIMPAN (SAVE)
-// ============================================================
-window.saveEvent = saveEvent;
-window.saveAnnouncement = saveAnnouncement;
-window.saveDonation = saveDonation;
-window.saveVolunteer = saveVolunteer;
-window.saveAssignment = saveAssignment;
-window.saveManualParticipant = saveManualParticipant;
-window.saveFamily = saveFamily;
-window.saveGroup = saveGroup;
-window.saveMember = saveMember;
-window.saveUser = saveUser;
