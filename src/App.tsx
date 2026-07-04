@@ -1,142 +1,110 @@
-/**
- * App Component - Root component dengan routing dan auth guard
- * Menggunakan HashRouter agar kompatibel dengan GitHub Pages
- */
+import { useState, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
+import { Header } from '@/components/Header';
+import { Login } from '@/components/Login';
+import { ToastContainer } from '@/components/Toast';
+import { Dashboard } from '@/pages/Dashboard';
+import { Members } from '@/pages/Members';
+import { Families } from '@/pages/Families';
+import { Groups } from '@/pages/Groups';
+import { Events } from '@/pages/Events';
+import { Attendance } from '@/pages/Attendance';
+import { Donations } from '@/pages/Donations';
+import { Finance } from '@/pages/Finance';
+import { Volunteers } from '@/pages/Volunteers';
+import { Communication } from '@/pages/Communication';
+import { Reports } from '@/pages/Reports';
+import { Users } from '@/pages/Users';
+import { Settings } from '@/pages/Settings';
+import { Deaths } from '@/pages/Deaths';
 
-import { useEffect, Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { initAuthListener } from '@/auth/auth';
-import { useStoreSelector } from '@/core/store';
-import { startRealtimeSync } from '@/data/repositories/realtime.service';
-import { LoginPage } from '@/ui/pages/LoginPage';
-import { Layout } from '@/ui/components/Layout';
-import { DashboardPage } from '@/ui/pages/DashboardPage';
-import { MembersPage } from '@/ui/pages/MembersPage';
-import { FamiliesPage } from '@/ui/pages/FamiliesPage';
-import { GroupsPage } from '@/ui/pages/GroupsPage';
-import { EventsPage } from '@/ui/pages/EventsPage';
-import { AttendancePage } from '@/ui/pages/AttendancePage';
-import { DonationsPage } from '@/ui/pages/DonationsPage';
-import { FinancePage } from '@/ui/pages/FinancePage';
-import { VolunteersPage } from '@/ui/pages/VolunteersPage';
-import { CommunicationPage } from '@/ui/pages/CommunicationPage';
-import { ReportsPage } from '@/ui/pages/ReportsPage';
-import { UsersPage } from '@/ui/pages/UsersPage';
-import { DeathsPage } from '@/ui/pages/DeathsPage';
+import { useAppData } from '@/hooks/useLocalStorage';
+import { useAuth } from '@/hooks/useAuth';
+import { useI18n } from '@/hooks/useI18n';
+import { useToast } from '@/hooks/useToast';
+import type { Language } from '@/types';
 
-// =========================================================
-// ERROR BOUNDARY (mencegah halaman putih saat runtime error)
-// =========================================================
+function AppContent() {
+  const { data, updateData } = useAppData();
+  const { currentUser, login, logout, isSuperAdmin, isAdmin, isViewOnly, canEdit, canDelete, canApprove } = useAuth();
+  const { lang, setLang, t, toggleLang } = useI18n();
+  const { toasts, showToast, removeToast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const navigate = useNavigate();
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
+  const handleLogin = useCallback((username: string, password: string) => {
+    return login(data.users, username, password);
+  }, [login, data.users]);
 
-class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-white p-8">
-          <div className="max-w-md text-center">
-            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-6">
-              <span className="text-red-400 text-2xl">⚠</span>
-            </div>
-            <h2 className="text-2xl font-bold text-red-400 mb-4">Terjadi Kesalahan</h2>
-            <p className="text-gray-400 mb-6 text-sm">
-              {this.state.error?.message || 'Kesalahan tidak terduga'}
-            </p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.hash = '#/';
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-700 rounded-xl text-white font-medium hover:shadow-lg hover:shadow-orange-500/20 transition-all"
-            >
-              Kembali ke Beranda
-            </button>
-          </div>
-        </div>
-      );
+  const handleQuickAction = useCallback((action: string) => {
+    switch (action) {
+      case 'member': navigate('/members'); break;
+      case 'event': navigate('/events'); break;
+      case 'checkin': navigate('/attendance'); break;
     }
-    return this.props.children;
+  }, [navigate]);
+
+  // Protected route wrapper
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} lang={lang} toggleLang={toggleLang} />;
   }
-}
 
-// =========================================================
-// APP ROUTES
-// =========================================================
-
-function AppRoutes() {
-  const isAuthenticated = useStoreSelector(s => s.isAuthenticated);
-
-  // Initialize auth listener (session restore)
-  useEffect(() => {
-    const unsub = initAuthListener();
-    return unsub;
-  }, []);
-
-  // Start real-time sync when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      const unsub = startRealtimeSync();
-      return unsub;
-    }
-  }, [isAuthenticated]);
+  const commonProps = {
+    data,
+    updateData,
+    lang: lang as Language,
+    t,
+    showToast,
+  };
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
-      />
-      <Route
-        path="/"
-        element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}
-      >
-        <Route index element={<DashboardPage />} />
-        <Route path="members" element={<MembersPage />} />
-        <Route path="families" element={<FamiliesPage />} />
-        <Route path="groups" element={<GroupsPage />} />
-        <Route path="events" element={<EventsPage />} />
-        <Route path="attendance" element={<AttendancePage />} />
-        <Route path="donations" element={<DonationsPage />} />
-        <Route path="finance" element={<FinancePage />} />
-        <Route path="volunteers" element={<VolunteersPage />} />
-        <Route path="communication" element={<CommunicationPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="deaths" element={<DeathsPage />} />
-      </Route>
-    </Routes>
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <Sidebar user={currentUser} lang={lang as Language} t={t} onCollapse={setSidebarCollapsed} />
+      
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-[70px]' : 'lg:ml-[260px]'}`}>
+        <Header
+          user={currentUser}
+          lang={lang as Language}
+          t={t}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onToggleLang={toggleLang}
+          onLogout={logout}
+          onQuickAction={handleQuickAction}
+        />
+        
+        <main className="p-6">
+          <Routes>
+            <Route path="/" element={<Dashboard {...commonProps} canEdit={canEdit()} />} />
+            <Route path="/members" element={<Members {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/families" element={<Families {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/groups" element={<Groups {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/events" element={<Events {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/attendance" element={<Attendance {...commonProps} canEdit={canEdit()} />} />
+            <Route path="/donations" element={<Donations {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/finance" element={<Finance {...commonProps} canEdit={canEdit()} canDelete={canDelete()} canApprove={canApprove()} />} />
+            <Route path="/volunteers" element={<Volunteers {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/communication" element={<Communication {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/reports" element={<Reports {...commonProps} />} />
+            <Route path="/users" element={<Users {...commonProps} canEdit={canEdit()} canDelete={canDelete()} />} />
+            <Route path="/settings" element={<Settings {...commonProps} setLang={setLang} />} />
+            <Route path="/deaths" element={<Deaths {...commonProps} canEdit={canEdit()} />} />
+          </Routes>
+        </main>
+      </div>
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </div>
   );
 }
 
-// =========================================================
-// ROOT APP
-// =========================================================
-
 function App() {
   return (
-    <ErrorBoundary>
-      <HashRouter>
-        <AppRoutes />
-      </HashRouter>
-    </ErrorBoundary>
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }
 
