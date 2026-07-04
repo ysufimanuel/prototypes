@@ -12,6 +12,7 @@ import { subscribeToCollection, addDocument, deleteDocument } from '@/data/repos
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Announcement } from '@/types/models';
 import { MessageSquare, Send, Save, X, Plus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 type CommTab = 'broadcast' | 'messages' | 'announcements';
 
@@ -30,6 +31,7 @@ export function CommunicationPage() {
     { id: '2', sender: 'Admin', content: 'Ya, besok jam 19:00 di gedung utama.', time: '10:05' },
   ]);
 
+  const [announceIdToDelete, setAnnounceIdToDelete] = useState<string | null>(null);
   const userCanEdit = canEdit(currentUser);
 
   useEffect(() => {
@@ -58,12 +60,17 @@ export function CommunicationPage() {
     store.setLoading(false);
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDeleteAnnouncement = (id: string) => {
+    setAnnounceIdToDelete(id);
+  };
+
+  const confirmDeleteAnnouncement = async () => {
+    if (!announceIdToDelete) return;
     store.setLoading(true);
-    try { await deleteDocument(DB_COLLECTIONS.ANNOUNCEMENTS, id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(DB_COLLECTIONS.ANNOUNCEMENTS, announceIdToDelete); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setAnnounceIdToDelete(null);
   };
 
   const handleSendMessage = () => {
@@ -171,6 +178,16 @@ export function CommunicationPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!announceIdToDelete}
+        onOpenChange={(open) => { if (!open) setAnnounceIdToDelete(null); }}
+        onConfirm={confirmDeleteAnnouncement}
+        title="Hapus Pengumuman"
+        description="Yakin ingin menghapus pengumuman ini?"
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
     </div>
   );
 }

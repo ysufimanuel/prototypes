@@ -11,6 +11,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Family } from '@/types/models';
 import { Home, Search, Plus, Pencil, Trash2, X, Users } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function FamiliesPage() {
   const { families, members, currentUser } = useStoreSelector(s => ({
@@ -23,6 +24,7 @@ export function FamiliesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingFamily, setEditingFamily] = useState<Family | null>(null);
   const [formData, setFormData] = useState<Partial<Family>>({});
+  const [familyToDelete, setFamilyToDelete] = useState<Family | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -75,16 +77,21 @@ export function FamiliesPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (family: Family) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (family: Family) => {
+    setFamilyToDelete(family);
+  };
+
+  const confirmDelete = async () => {
+    if (!familyToDelete) return;
     store.setLoading(true);
     try {
-      await deleteDocument(DB_COLLECTIONS.FAMILIES, family.id);
+      await deleteDocument(DB_COLLECTIONS.FAMILIES, familyToDelete.id);
       store.showToast(t('delete-success'), 'success');
     } catch {
       store.showToast(t('delete-error'), 'error');
     }
     store.setLoading(false);
+    setFamilyToDelete(null);
   };
 
   const openAdd = () => {
@@ -175,6 +182,17 @@ export function FamiliesPage() {
           ))
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!familyToDelete}
+        onOpenChange={(open) => { if (!open) setFamilyToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Keluarga"
+        description={`Yakin ingin menghapus keluarga ${familyToDelete?.nama || ''}?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">

@@ -2,7 +2,7 @@
  * Reports Page - Laporan dan manajemen data
  */
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useStoreSelector } from '@/core/store';
 import { store } from '@/core/store';
 import { t } from '@/core/i18n';
@@ -12,12 +12,14 @@ import { subscribeToCollection } from '@/data/repositories/base.repository';
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Member, Attendance, Donation } from '@/types/models';
 import { BarChart3, Users, ClipboardCheck, HeartHandshake, Download, Upload, Trash2, FileText } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function ReportsPage() {
   const { members, attendance, donations, events, groups, volunteers } = useStoreSelector(s => ({
     members: s.members, attendance: s.attendance, donations: s.donations, events: s.events,
     groups: s.groups, volunteers: s.volunteers,
   }));
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
   useEffect(() => {
     const unsub1 = subscribeToCollection<Member>(DB_COLLECTIONS.MEMBERS, (data) => store.setCollection('members', data));
@@ -58,8 +60,12 @@ export function ReportsPage() {
   };
 
   const handleClearData = () => {
-    if (!window.confirm('Yakin ingin menghapus SEMUA data? Ini tidak bisa dibatalkan!')) return;
+    setShowClearDialog(true);
+  };
+
+  const confirmClearData = () => {
     store.showToast('Data dihapus (simulasi)', 'warning');
+    setShowClearDialog(false);
   };
 
   const generateReportData = (type: string) => {
@@ -130,6 +136,16 @@ export function ReportsPage() {
           <button onClick={handleClearData} className="px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium flex items-center gap-2 hover:bg-red-500/20 transition-colors"><Trash2 className="w-4 h-4" />{t('clear-all-data')}</button>
         </div>
       </div>
+      <ConfirmDialog
+        open={showClearDialog}
+        onOpenChange={setShowClearDialog}
+        onConfirm={confirmClearData}
+        title="Hapus Semua Data"
+        description="Yakin ingin menghapus SEMUA data? Tindakan ini tidak bisa dibatalkan!"
+        confirmText="Hapus Semua"
+        cancelText="Batal"
+        destructive
+      />
     </div>
   );
 }

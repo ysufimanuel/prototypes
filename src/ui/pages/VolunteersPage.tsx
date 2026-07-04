@@ -11,6 +11,7 @@ import { subscribeToCollection, addDocument, deleteDocument } from '@/data/repos
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Volunteer, Assignment } from '@/types/models';
 import { HandHelping, Search, Plus, Pencil, Trash2, X, Calendar } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 type VolunteerTab = 'list' | 'schedule' | 'assignment';
 
@@ -24,6 +25,7 @@ export function VolunteersPage() {
   const [modalType, setModalType] = useState<'volunteer' | 'assignment'>('volunteer');
   const [formData, setFormData] = useState<Record<string, any>>({});
 
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; coll: string } | null>(null);
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
 
@@ -63,12 +65,17 @@ export function VolunteersPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (id: string, coll: string) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (id: string, coll: string) => {
+    setDeleteTarget({ id, coll });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     store.setLoading(true);
-    try { await deleteDocument(coll, id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(deleteTarget.coll, deleteTarget.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setDeleteTarget(null);
   };
 
   const tabs = [
@@ -180,6 +187,16 @@ export function VolunteersPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Data Relawan"
+        description="Yakin ingin menghapus data ini?"
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
     </div>
   );
 }

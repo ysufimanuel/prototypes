@@ -12,6 +12,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Pemasukan, Pengeluaran, FinanceCategory } from '@/types/models';
 import { Banknote, Plus, Trash2, X, Check, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 type FinanceTab = 'dashboard' | 'income' | 'expense' | 'categories';
 
@@ -25,6 +26,7 @@ export function FinancePage() {
   const [modalType, setModalType] = useState<'income' | 'expense' | 'category'>('income');
   const [formData, setFormData] = useState<Record<string, any>>({});
 
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; coll: string } | null>(null);
   const userCanEdit = canEdit(currentUser);
   const userCanApprove = canApproveFinance(currentUser);
 
@@ -75,12 +77,17 @@ export function FinancePage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (id: string, coll: string) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (id: string, coll: string) => {
+    setDeleteTarget({ id, coll });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     store.setLoading(true);
-    try { await deleteDocument(coll, id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(deleteTarget.coll, deleteTarget.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setDeleteTarget(null);
   };
 
   const tabs = [
@@ -172,6 +179,16 @@ export function FinancePage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Data Keuangan"
+        description="Yakin ingin menghapus data ini? Tindakan tidak bisa dibatalkan."
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
     </div>
   );
 }

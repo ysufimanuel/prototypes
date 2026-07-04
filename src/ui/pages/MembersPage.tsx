@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Eye,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function MembersPage() {
   const [searchParams] = useSearchParams();
@@ -49,6 +50,7 @@ export function MembersPage() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<Partial<Member>>({});
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -111,16 +113,21 @@ export function MembersPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (member: Member) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (member: Member) => {
+    setMemberToDelete(member);
+  };
+
+  const confirmDelete = async () => {
+    if (!memberToDelete) return;
     store.setLoading(true);
     try {
-      await deleteDocument(DB_COLLECTIONS.MEMBERS, member.id);
+      await deleteDocument(DB_COLLECTIONS.MEMBERS, memberToDelete.id);
       store.showToast(t('delete-success'), 'success');
     } catch {
       store.showToast(t('delete-error'), 'error');
     }
     store.setLoading(false);
+    setMemberToDelete(null);
   };
 
   const openEdit = (member: Member) => {
@@ -491,6 +498,18 @@ export function MembersPage() {
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={!!memberToDelete}
+        onOpenChange={(open) => { if (!open) setMemberToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Jemaat"
+        description={`Yakin ingin menghapus ${memberToDelete?.nama || ''}? Tindakan ini tidak bisa dibatalkan.`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
 
       {/* Detail Modal */}
       {showDetailModal && selectedMember && (

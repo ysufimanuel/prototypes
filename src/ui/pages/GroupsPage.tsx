@@ -11,6 +11,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Group } from '@/types/models';
 import { Group as GroupIcon, Search, Plus, Pencil, Trash2, X, Users } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function GroupsPage() {
   const { groups, members, currentUser } = useStoreSelector(s => ({ groups: s.groups, members: s.members, currentUser: s.currentUser }));
@@ -18,6 +19,7 @@ export function GroupsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [formData, setFormData] = useState<Partial<Group>>({});
+  const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -53,12 +55,17 @@ export function GroupsPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (group: Group) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (group: Group) => {
+    setGroupToDelete(group);
+  };
+
+  const confirmDelete = async () => {
+    if (!groupToDelete) return;
     store.setLoading(true);
-    try { await deleteDocument(DB_COLLECTIONS.GROUPS, group.id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(DB_COLLECTIONS.GROUPS, groupToDelete.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setGroupToDelete(null);
   };
 
   return (
@@ -93,6 +100,17 @@ export function GroupsPage() {
             </div>
           ))}
       </div>
+      <ConfirmDialog
+        open={!!groupToDelete}
+        onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Grup"
+        description={`Yakin ingin menghapus grup ${groupToDelete?.nama || ''}?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
+
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-[#141414] rounded-2xl border border-[#2a2a2a] w-full max-w-lg">

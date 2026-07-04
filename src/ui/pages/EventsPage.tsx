@@ -12,6 +12,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Event } from '@/types/models';
 import { Calendar, Search, Plus, Pencil, Trash2, X, MapPin, Users } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function EventsPage() {
   const { events, currentUser } = useStoreSelector(s => ({ events: s.events, currentUser: s.currentUser }));
@@ -20,6 +21,7 @@ export function EventsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [formData, setFormData] = useState<Partial<Event>>({});
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -62,12 +64,17 @@ export function EventsPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (evt: Event) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (evt: Event) => {
+    setEventToDelete(evt);
+  };
+
+  const confirmDelete = async () => {
+    if (!eventToDelete) return;
     store.setLoading(true);
-    try { await deleteDocument(DB_COLLECTIONS.EVENTS, evt.id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(DB_COLLECTIONS.EVENTS, eventToDelete.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setEventToDelete(null);
   };
 
   return (
@@ -109,6 +116,17 @@ export function EventsPage() {
             </div>
           ))}
       </div>
+      <ConfirmDialog
+        open={!!eventToDelete}
+        onOpenChange={(open) => { if (!open) setEventToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Event"
+        description={`Yakin ingin menghapus event ${eventToDelete?.nama || ''}?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
+
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-[#141414] rounded-2xl border border-[#2a2a2a] w-full max-w-lg max-h-[85vh] overflow-y-auto">

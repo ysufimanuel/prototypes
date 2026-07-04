@@ -12,6 +12,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Donation } from '@/types/models';
 import { HeartHandshake, Search, Plus, Pencil, Trash2, X, TrendingUp, Users, BarChart3 } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function DonationsPage() {
   const { donations, donors, currentUser } = useStoreSelector(s => ({ donations: s.donations, donors: s.donors, currentUser: s.currentUser }));
@@ -21,6 +22,7 @@ export function DonationsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingDonation, setEditingDonation] = useState<Donation | null>(null);
   const [formData, setFormData] = useState<Partial<Donation>>({});
+  const [donationToDelete, setDonationToDelete] = useState<Donation | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -59,12 +61,17 @@ export function DonationsPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (don: Donation) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (don: Donation) => {
+    setDonationToDelete(don);
+  };
+
+  const confirmDelete = async () => {
+    if (!donationToDelete) return;
     store.setLoading(true);
-    try { await deleteDocument(DB_COLLECTIONS.DONATIONS, don.id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(DB_COLLECTIONS.DONATIONS, donationToDelete.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setDonationToDelete(null);
   };
 
   return (
@@ -106,6 +113,17 @@ export function DonationsPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!donationToDelete}
+        onOpenChange={(open) => { if (!open) setDonationToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Donasi"
+        description="Yakin ingin menghapus data donasi ini?"
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">

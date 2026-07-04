@@ -12,6 +12,7 @@ import { subscribeToCollection, addDocument, updateDocument, deleteDocument } fr
 import { DB_COLLECTIONS } from '@/core/config';
 import type { Death } from '@/types/models';
 import { Cross, Search, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 
 export function DeathsPage() {
   const { deaths, members, currentUser } = useStoreSelector(s => ({ deaths: s.deaths, members: s.members, currentUser: s.currentUser }));
@@ -19,6 +20,7 @@ export function DeathsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingDeath, setEditingDeath] = useState<Death | null>(null);
   const [formData, setFormData] = useState<Partial<Death>>({});
+  const [deathToDelete, setDeathToDelete] = useState<Death | null>(null);
 
   const userCanEdit = canEdit(currentUser);
   const userCanDelete = canDelete(currentUser);
@@ -57,12 +59,17 @@ export function DeathsPage() {
     store.setLoading(false);
   };
 
-  const handleDelete = async (d: Death) => {
-    if (!window.confirm(t('confirm-delete'))) return;
+  const handleDelete = (d: Death) => {
+    setDeathToDelete(d);
+  };
+
+  const confirmDelete = async () => {
+    if (!deathToDelete) return;
     store.setLoading(true);
-    try { await deleteDocument(DB_COLLECTIONS.DEATHS, d.id); store.showToast(t('delete-success'), 'success'); }
+    try { await deleteDocument(DB_COLLECTIONS.DEATHS, deathToDelete.id); store.showToast(t('delete-success'), 'success'); }
     catch { store.showToast(t('delete-error'), 'error'); }
     store.setLoading(false);
+    setDeathToDelete(null);
   };
 
   const openAdd = () => {
@@ -109,6 +116,17 @@ export function DeathsPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!deathToDelete}
+        onOpenChange={(open) => { if (!open) setDeathToDelete(null); }}
+        onConfirm={confirmDelete}
+        title="Hapus Data Kematian"
+        description={`Yakin ingin menghapus data kematian ${deathToDelete?.nama || ''}?`}
+        confirmText="Hapus"
+        cancelText="Batal"
+        destructive
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
