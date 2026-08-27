@@ -1351,19 +1351,28 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Login form
     const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        loginForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const usernameOrEmail = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
-            const notification = document.getElementById('login-notification');
-
-            notification.className = 'login-notification processing';
-            notification.textContent = currentLanguage === 'id' ? 'Sedang memproses...' : 'Processing...';
-            notification.style.display = 'block';
-
-            const result = await login(usernameOrEmail, password);
-
+if (loginForm) {
+    loginForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const usernameOrEmail = document.getElementById('username-input').value;
+        const password = document.getElementById('password-input').value;
+        const notification = document.getElementById('login-notification');
+        notification.className = 'login-notification processing';
+        
+        const result = await login(usernameOrEmail, password);
+        if (result.success) {
+            // ✅ FIX: Set active church setelah login berhasil
+            try {
+                const profile = await window.getUserProfile(result.user.uid);
+                if (profile && profile.churchId) {
+                    window.setActiveChurch(profile.churchId);
+                    console.log('[LOGIN FORM] Active church set to:', profile.churchId);
+                }
+            } catch (e) {
+                console.warn('[LOGIN FORM] Error setting church:', e);
+            }
+            
+            notification.className = 'login-notification success';
             if (result.success) {
                 notification.className = 'login-notification success';
                 notification.textContent = currentLanguage === 'id' ? 'Login berhasil!' : 'Login successful!';
