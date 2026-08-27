@@ -1175,13 +1175,6 @@ function canApprove() {
 // ========================================
 
 async function login(usernameOrEmail, password) {
-    // ✅ FIX: Fetch profile dan set active church
-            const profile = await window.getUserProfile(user.uid);
-            if (profile && profile.churchId) {
-                window.setActiveChurch(profile.churchId);
-                console.log('[LOGIN] Active church set to:', profile.churchId);
-}
-    return { success: true, user };
     if (window.isAuthReady && window.isAuthReady()) {
         const user = await window.loginWithFirebase(usernameOrEmail, password);
         if (user) {
