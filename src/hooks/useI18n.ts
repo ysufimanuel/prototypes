@@ -1,0 +1,187 @@
+/**
+ * INTERNATIONALIZATION HOOK
+ * ====================================================================
+ * Hook untuk manajemen bahasa (ID/EN)
+ */
+import { useState, useCallback, useEffect } from 'react';
+import type { Language } from '@/types';
+
+const translations: Record<string, Record<Language, string>> = {
+  // Navigasi
+  'dashboard': { id: 'Dashboard', en: 'Dashboard' },
+  'members': { id: 'Jemaat', en: 'Members' },
+  'families': { id: 'Keluarga', en: 'Families' },
+  'groups': { id: 'Grup', en: 'Groups' },
+  'events': { id: 'Acara', en: 'Events' },
+  'attendance': { id: 'Kehadiran', en: 'Attendance' },
+  'donations': { id: 'Donasi', en: 'Donations' },
+  'finance': { id: 'Keuangan', en: 'Finance' },
+  'volunteers': { id: 'Relawan', en: 'Volunteers' },
+  'communication': { id: 'Komunikasi', en: 'Communication' },
+  'reports': { id: 'Laporan', en: 'Reports' },
+  'users': { id: 'Pengguna', en: 'Users' },
+  'settings': { id: 'Pengaturan', en: 'Settings' },
+  'deaths': { id: 'Data Kematian', en: 'Death Records' },
+
+  // Aksi umum
+  'add': { id: 'Tambah', en: 'Add' },
+  'edit': { id: 'Edit', en: 'Edit' },
+  'delete': { id: 'Hapus', en: 'Delete' },
+  'save': { id: 'Simpan', en: 'Save' },
+  'cancel': { id: 'Batal', en: 'Cancel' },
+  'close': { id: 'Tutup', en: 'Close' },
+  'search': { id: 'Cari...', en: 'Search...' },
+  'filter': { id: 'Filter', en: 'Filter' },
+  'export': { id: 'Export', en: 'Export' },
+  'print': { id: 'Cetak', en: 'Print' },
+  'detail': { id: 'Detail', en: 'Detail' },
+  'view': { id: 'Lihat', en: 'View' },
+  'all': { id: 'Semua', en: 'All' },
+  'none': { id: 'Tidak ada', en: 'None' },
+  'active': { id: 'Aktif', en: 'Active' },
+  'inactive': { id: 'Nonaktif', en: 'Inactive' },
+  'status': { id: 'Status', en: 'Status' },
+  'name': { id: 'Nama', en: 'Name' },
+  'email': { id: 'Email', en: 'Email' },
+  'phone': { id: 'Telepon', en: 'Phone' },
+  'address': { id: 'Alamat', en: 'Address' },
+  'city': { id: 'Kota', en: 'City' },
+  'gender': { id: 'Jenis Kelamin', en: 'Gender' },
+  'birth-date': { id: 'Tanggal Lahir', en: 'Birth Date' },
+  'birth-place': { id: 'Tempat Lahir', en: 'Birth Place' },
+  'postal-code': { id: 'Kode Pos', en: 'Postal Code' },
+  'group': { id: 'Grup', en: 'Group' },
+  'family': { id: 'Keluarga', en: 'Family' },
+  'join-date': { id: 'Tanggal Bergabung', en: 'Join Date' },
+  'select': { id: 'Pilih', en: 'Select' },
+  'male': { id: 'Laki-laki', en: 'Male' },
+  'female': { id: 'Perempuan', en: 'Female' },
+  'no-data': { id: 'Tidak ada data', en: 'No data available' },
+  'actions': { id: 'Aksi', en: 'Actions' },
+  'confirm': { id: 'Konfirmasi', en: 'Confirm' },
+  'yes': { id: 'Ya', en: 'Yes' },
+  'no': { id: 'Tidak', en: 'No' },
+  'notifications': { id: 'Notifikasi', en: 'Notifications' },
+  'profile': { id: 'Profil', en: 'Profile' },
+  'logout': { id: 'Keluar', en: 'Logout' },
+  'date': { id: 'Tanggal', en: 'Date' },
+  'time': { id: 'Waktu', en: 'Time' },
+  'description': { id: 'Deskripsi', en: 'Description' },
+  'type': { id: 'Tipe', en: 'Type' },
+  'amount': { id: 'Jumlah', en: 'Amount' },
+  'category': { id: 'Kategori', en: 'Category' },
+  'donor': { id: 'Donatur', en: 'Donor' },
+  'leader': { id: 'Pemimpin', en: 'Leader' },
+  'head-family': { id: 'Kepala Keluarga', en: 'Head of Family' },
+  'family-members': { id: 'Anggota Keluarga', en: 'Family Members' },
+  'members-count': { id: 'Jumlah Anggota', en: 'Members Count' },
+  'checkin-time': { id: 'Waktu Check-in', en: 'Check-in Time' },
+  'checkin': { id: 'Check-in', en: 'Check-in' },
+  'present': { id: 'Hadir', en: 'Present' },
+  'permission': { id: 'Izin', en: 'Permission' },
+  'sick': { id: 'Sakit', en: 'Sick' },
+  'absent': { id: 'Alpha', en: 'Absent' },
+  'event': { id: 'Acara', en: 'Event' },
+  'location': { id: 'Tempat', en: 'Location' },
+  'start': { id: 'Mulai', en: 'Start' },
+  'end': { id: 'Selesai', en: 'End' },
+  'participants': { id: 'Peserta', en: 'Participants' },
+  'notes': { id: 'Catatan', en: 'Notes' },
+  'select-member': { id: 'Pilih Anggota', en: 'Select Member' },
+  'select-volunteer': { id: 'Pilih Relawan', en: 'Select Volunteer' },
+  'select-event': { id: 'Pilih Acara', en: 'Select Event' },
+  'select-donor': { id: 'Pilih Donatur', en: 'Select Donor' },
+  'select-category': { id: 'Pilih Kategori', en: 'Select Category' },
+  'all-categories': { id: 'Semua Kategori', en: 'All Categories' },
+  'other': { id: 'Lainnya', en: 'Other' },
+  'income': { id: 'Pemasukan', en: 'Income' },
+  'expense': { id: 'Pengeluaran', en: 'Expense' },
+  'balance': { id: 'Saldo', en: 'Balance' },
+  'total-income': { id: 'Total Pemasukan', en: 'Total Income' },
+  'total-expense': { id: 'Total Pengeluaran', en: 'Total Expense' },
+  'approved': { id: 'Disetujui', en: 'Approved' },
+  'rejected': { id: 'Ditolak', en: 'Rejected' },
+  'pending': { id: 'Menunggu', en: 'Pending' },
+  'approve': { id: 'Setujui', en: 'Approve' },
+  'reject': { id: 'Tolak', en: 'Reject' },
+  'history': { id: 'Riwayat', en: 'History' },
+  'settings-general': { id: 'Umum', en: 'General' },
+  'settings-appearance': { id: 'Tampilan', en: 'Appearance' },
+  'settings-language': { id: 'Bahasa', en: 'Language' },
+  'settings-data': { id: 'Data', en: 'Data' },
+  'add-member': { id: 'Tambah Anggota', en: 'Add Member' },
+  'add-family': { id: 'Tambah Keluarga', en: 'Add Family' },
+  'add-group': { id: 'Tambah Grup', en: 'Add Group' },
+  'add-event': { id: 'Tambah Acara', en: 'Add Event' },
+  'add-donation': { id: 'Tambah Donasi', en: 'Add Donation' },
+  'add-volunteer': { id: 'Tambah Relawan', en: 'Add Volunteer' },
+  'add-income': { id: 'Tambah Pemasukan', en: 'Add Income' },
+  'add-expense': { id: 'Tambah Pengeluaran', en: 'Add Expense' },
+  'add-category': { id: 'Tambah Kategori', en: 'Add Category' },
+  'edit-income': { id: 'Edit Pemasukan', en: 'Edit Income' },
+  'edit-expense': { id: 'Edit Pengeluaran', en: 'Edit Expense' },
+  'birthday': { id: 'Ulang Tahun', en: 'Birthday' },
+  'today': { id: 'Hari Ini', en: 'Today' },
+  'this-week': { id: 'Minggu Ini', en: 'This Week' },
+  'this-month': { id: 'Bulan Ini', en: 'This Month' },
+  'quick-access': { id: 'Akses Cepat', en: 'Quick Access' },
+  'member-add': { id: 'Tambah Jemaat', en: 'Add Member' },
+  'event-add': { id: 'Tambah Acara', en: 'Add Event' },
+  'check-in': { id: 'Absen', en: 'Check In' },
+  'upcoming-events': { id: 'Acara Mendatang', en: 'Upcoming Events' },
+  'recent-activities': { id: 'Aktivitas Terbaru', en: 'Recent Activities' },
+  'welcome-back': { id: 'Selamat Datang', en: 'Welcome Back' },
+  'view-only-message': { id: 'Mode Lihat Saja', en: 'View Only Mode' },
+  'superadmin': { id: 'Super Admin', en: 'Super Admin' },
+  'admin': { id: 'Admin', en: 'Admin' },
+  'user': { id: 'User', en: 'User' },
+  'church-profile': { id: 'Profil Gereja', en: 'Church Profile' },
+  'church-name': { id: 'Nama Gereja', en: 'Church Name' },
+  'pastor-name': { id: 'Nama Pendeta', en: 'Pastor Name' },
+  'church-address': { id: 'Alamat Gereja', en: 'Church Address' },
+  'church-phone': { id: 'Telepon Gereja', en: 'Church Phone' },
+  'church-email': { id: 'Email Gereja', en: 'Church Email' },
+  'website': { id: 'Website', en: 'Website' },
+  'denomination': { id: 'Denominasi', en: 'Denomination' },
+  'vision': { id: 'Visi', en: 'Vision' },
+  'mission': { id: 'Misi', en: 'Mission' },
+  'public-access': { id: 'Akses Publik', en: 'Public Access' },
+  'show-birthdays': { id: 'Tampilkan Ulang Tahun', en: 'Show Birthdays' },
+  'save-changes': { id: 'Simpan Perubahan', en: 'Save Changes' },
+  'backup': { id: 'Backup', en: 'Backup' },
+  'restore': { id: 'Restore', en: 'Restore' },
+  'clear-data': { id: 'Hapus Semua Data', en: 'Clear All Data' },
+  'language': { id: 'Bahasa', en: 'Language' },
+  'indonesian': { id: 'Bahasa Indonesia', en: 'Indonesian' },
+  'english': { id: 'English', en: 'English' },
+  'dark-mode': { id: 'Mode Gelap', en: 'Dark Mode' },
+  'theme': { id: 'Tema', en: 'Theme' },
+  'success': { id: 'Berhasil', en: 'Success' },
+  'error': { id: 'Gagal', en: 'Error' },
+  'warning': { id: 'Peringatan', en: 'Warning' },
+  'info': { id: 'Info', en: 'Info' },
+};
+
+export function useI18n() {
+  const [lang, setLang] = useState<Language>(() => {
+    return (localStorage.getItem('cmsLanguage') as Language) || 'id';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cmsLanguage', lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  const t = useCallback(
+    (key: string): string => {
+      return translations[key]?.[lang] || key;
+    },
+    [lang]
+  );
+
+  const toggleLang = useCallback(() => {
+    setLang(prev => (prev === 'id' ? 'en' : 'id'));
+  }, []);
+
+  return { lang, setLang, t, toggleLang };
+}
