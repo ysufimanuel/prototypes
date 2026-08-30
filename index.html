@@ -1118,7 +1118,7 @@
                         </div>
                     </div>
                           <!-- Pemasukan Tab -->
-                    <div id="finance-pemasukan" class="finance-tab-content">
+                    div id="finance-pemasukan" class="finance-tab-content">
                         <div class="action-bar">
                             <div class="search-box">
                                 <i class="fas fa-search"></i>
@@ -2160,46 +2160,24 @@ Modal -->
         </div>
 
         <!-- FORM -->
-        <!-- FORM -->
-        <div id="death-form-container" style="display:none; background:#fff; padding:20px; border-radius:8px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-            <h3 id="death-form-title" style="margin-bottom:16px; font-size:16px;">Tambah Data</h3>
+        <div id="death-form-container">
+            <input type="text" id="death-nama" placeholder="Nama Jemaat" class="form-control">
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                <div style="grid-column:1/-1;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Nama Jemaat <span style="color:red">*</span></label>
-                    <input type="text" id="death-nama" placeholder="Nama lengkap" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div>
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Tanggal Lahir</label>
-                    <input type="date" id="death-lahir" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div>
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Tanggal Wafat <span style="color:red">*</span></label>
-                    <input type="date" id="death-wafat" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div>
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Tempat Wafat</label>
-                    <input type="text" id="death-tempat" placeholder="Nama rumah sakit / tempat" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div>
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Waktu Wafat</label>
-                    <input type="time" id="death-waktu" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div>
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Penyebab Wafat</label>
-                    <input type="text" id="death-penyebab" placeholder="Misal: Serangan jantung" class="form-control" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px;">
-                </div>
-                <div style="grid-column:1/-1;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">Riwayat Penyakit</label>
-                    <textarea id="death-riwayat" placeholder="Riwayat penyakit sebelumnya (opsional)" class="form-control" rows="2" style="width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:6px; resize:vertical;"></textarea>
-                </div>
-            </div>
+            <label>Tanggal Lahir</label>
+            <input type="date" id="death-lahir" class="form-control">
 
-            <div style="margin-top:16px; display:flex; gap:8px;">
-                <button class="btn btn-success" onclick="saveDeathData()"><i class="fas fa-save"></i> Simpan</button>
-                <button id="btn-cancel-death" class="btn btn-secondary" onclick="cancelDeathEdit()" style="display:none;"><i class="fas fa-times"></i> Batal Edit</button>
-                <button class="btn btn-secondary" onclick="toggleDeathForm()">Tutup Form</button>
-            </div>
+            <label>Tanggal Wafat</label>
+            <input type="date" id="death-wafat" class="form-control">
+
+            <textarea id="death-riwayat" placeholder="Riwayat Penyakit" class="form-control"></textarea>
+
+            <textarea id="death-penyebab" placeholder="Penyebab Wafat" class="form-control"></textarea>
+
+            <input type="text" id="death-tempat" placeholder="Tempat Wafat" class="form-control">
+
+            <input type="time" id="death-waktu" class="form-control">
+
+            <button class="btn btn-success" onclick="saveDeathData()">Simpan</button>
         </div>
 
         <!-- LIST -->
@@ -2227,5 +2205,8 @@ Modal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="module" src="js/firebase.js"></script>
     <script type="module" src="js/app.js"></script>
+    <!-- Real-time Firebase patch + Birthday Notification -->
+    <script src="js/realtime-firebase.js" defer></script>
 </body>
-</html>
+
+            </html>

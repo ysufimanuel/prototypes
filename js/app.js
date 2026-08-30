@@ -938,7 +938,8 @@ async function loadAllDataFromFirestore() {
             pengeluaran: pengeluaran || [],
             financeCategories: financeCategories || [],
             finance: financeConfig || { saldoAwal: 0 },
-            approvalHistory: approvalHistory || []
+            approvalHistory: approvalHistory || [],
+            activities: []
         };
     } catch (error) {
         console.error('[APP] Error loading data from Firestore:', error);
@@ -994,238 +995,22 @@ function initDataLocal() {
 
 // Save data to Firestore or localStorage
 async function saveData(data) {
+    // Update cache
     dataCache = data;
-    return true; // Data is saved by specific functions like saveMemberToFirebase
-}
 
-async function saveMemberToFirebase(memberId, memberData) {
-    try {
-        showLoading(true);
-        if (memberId) {
-            // Update existing
-            await window.firebaseUpdateDoc('members', memberId, memberData);
-        } else {
-            // Create new
-            const result = await window.firebaseAddDoc('members', memberData);
-            memberId = result.id;
-        }
-        showToast('Member saved successfully', 'success');
-        showLoading(false);
-        return memberId;
-    } catch (e) {
-        console.error('[SAVE] Member error:', e);
-        showToast('Failed to save member: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
+    if (isFirebaseReady()) {
+        // Firestore saves are handled per-collection in specific functions
+        return true;
     }
-}
 
-/**
- * Delete member from Firestore
- */
-async function deleteMemberFromFirebase(memberId) {
+    // Fallback to localStorage
     try {
-        showLoading(true);
-        await window.firebaseDeleteDoc('members', memberId);
-        showToast('Member deleted successfully', 'success');
-        showLoading(false);
+        localStorage.setItem('cmsV2Data', JSON.stringify(data));
         return true;
     } catch (e) {
-        console.error('[DELETE] Member error:', e);
-        showToast('Failed to delete member: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save family to Firestore
- */
-async function saveFamilyToFirebase(familyId, familyData) {
-    try {
-        showLoading(true);
-        if (familyId) {
-            await window.firebaseUpdateDoc('families', familyId, familyData);
-        } else {
-            const result = await window.firebaseAddDoc('families', familyData);
-            familyId = result.id;
-        }
-        showToast('Family saved successfully', 'success');
-        showLoading(false);
-        return familyId;
-    } catch (e) {
-        console.error('[SAVE] Family error:', e);
-        showToast('Failed to save family: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save group to Firestore
- */
-async function saveGroupToFirebase(groupId, groupData) {
-    try {
-        showLoading(true);
-        if (groupId) {
-            await window.firebaseUpdateDoc('groups', groupId, groupData);
-        } else {
-            const result = await window.firebaseAddDoc('groups', groupData);
-            groupId = result.id;
-        }
-        showToast('Group saved successfully', 'success');
-        showLoading(false);
-        return groupId;
-    } catch (e) {
-        console.error('[SAVE] Group error:', e);
-        showToast('Failed to save group: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save event to Firestore
- */
-async function saveEventToFirebase(eventId, eventData) {
-    try {
-        showLoading(true);
-        if (eventId) {
-            await window.firebaseUpdateDoc('events', eventId, eventData);
-        } else {
-            const result = await window.firebaseAddDoc('events', eventData);
-            eventId = result.id;
-        }
-        showToast('Event saved successfully', 'success');
-        showLoading(false);
-        return eventId;
-    } catch (e) {
-        console.error('[SAVE] Event error:', e);
-        showToast('Failed to save event: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save attendance to Firestore
- */
-async function saveAttendanceToFirebase(attendanceId, attendanceData) {
-    try {
-        if (attendanceId) {
-            await window.firebaseUpdateDoc('attendance', attendanceId, attendanceData);
-        } else {
-            const result = await window.firebaseAddDoc('attendance', attendanceData);
-            attendanceId = result.id;
-        }
-        return attendanceId;
-    } catch (e) {
-        console.error('[SAVE] Attendance error:', e);
-        showToast('Failed to save attendance: ' + e.message, 'error');
-        throw e;
-    }
-}
-
-/**
- * Save donation to Firestore
- */
-async function saveDonationToFirebase(donationId, donationData) {
-    try {
-        showLoading(true);
-        if (donationId) {
-            await window.firebaseUpdateDoc('donations', donationId, donationData);
-        } else {
-            const result = await window.firebaseAddDoc('donations', donationData);
-            donationId = result.id;
-        }
-        showToast('Donation saved successfully', 'success');
-        showLoading(false);
-        return donationId;
-    } catch (e) {
-        console.error('[SAVE] Donation error:', e);
-        showToast('Failed to save donation: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save user to Firestore
- */
-async function saveUserToFirebase(userId, userData) {
-    try {
-        showLoading(true);
-        if (userId) {
-            await window.firebaseUpdateDoc('users', userId, userData);
-        } else {
-            const result = await window.firebaseAddDoc('users', userData);
-            userId = result.id;
-        }
-        showToast('User saved successfully', 'success');
-        showLoading(false);
-        return userId;
-    } catch (e) {
-        console.error('[SAVE] User error:', e);
-        showToast('Failed to save user: ' + e.message, 'error');
-        showLoading(false);
-        throw e;
-    }
-}
-
-/**
- * Save approval history to Firestore
- */
-async function saveApprovalToFirebase(approvalData) {
-    try {
-        const result = await window.firebaseAddDoc('approvalHistory', {
-            ...approvalData,
-            timestamp: new Date().toISOString()
-        });
-        showToast('Approval recorded successfully', 'success');
-        return result.id;
-    } catch (e) {
-        console.error('[SAVE] Approval error:', e);
-        showToast('Failed to record approval: ' + e.message, 'error');
-        throw e;
-    }
-}
-
-/**
- * Load all data from Firestore at startup
- */
-async function loadAllDataFromFirebase() {
-    try {
-        showLoading(true);
-        const [members, families, groups, events, attendance, donations, users, approvalHistory] = await Promise.all([
-            window.firebaseGetAllDocs('members'),
-            window.firebaseGetAllDocs('families'),
-            window.firebaseGetAllDocs('groups'),
-            window.firebaseGetAllDocs('events'),
-            window.firebaseGetAllDocs('attendance'),
-            window.firebaseGetAllDocs('donations'),
-            window.firebaseGetAllDocs('users'),
-            window.firebaseGetAllDocs('approvalHistory')
-        ]);
-
-        dataCache = {
-            members: members || [],
-            families: families || [],
-            groups: groups || [],
-            events: events || [],
-            attendance: attendance || [],
-            donations: donations || [],
-            users: users || [],
-            approvalHistory: approvalHistory || []
-        };
-
-        console.log('[APP] All data loaded from Firestore');
-        showLoading(false);
-        return dataCache;
-    } catch (e) {
-        console.error('[APP] Error loading data:', e);
-        showToast('Failed to load data: ' + e.message, 'error');
-        showLoading(false);
-        return defaultData;
+        console.error('Error saving data:', e);
+        showToast(currentLanguage === 'id' ? 'Gagal menyimpan data' : 'Failed to save data', 'error');
+        return false;
     }
 }
 
@@ -1328,6 +1113,16 @@ function clearAllData() {
 }
 
 let currentUser = null;
+
+// ========================================
+// FALLBACK: Mencegah error 'isAuthReady is not defined'
+// ========================================
+if (typeof window.isAuthReady !== 'function') {
+    window.isAuthReady = function() {
+        return typeof window.auth !== 'undefined' && window.auth !== null;
+    };
+}
+
 let currentChatId = null;
 let attendanceChart = null;
 let memberChart = null;
@@ -1380,7 +1175,7 @@ function canApprove() {
 // ========================================
 
 async function login(usernameOrEmail, password) {
-    if (isAuthReady()) {
+    if (window.isAuthReady && window.isAuthReady()) {
         const user = await window.loginWithFirebase(usernameOrEmail, password);
         if (user) {
             currentUser = user;
@@ -1417,7 +1212,7 @@ async function login(usernameOrEmail, password) {
 }
 
 async function logout() {
-    if (isAuthReady()) await window.logoutFromFirebase();
+    if (window.isAuthReady && window.isAuthReady()) await window.logoutFromFirebase();
     currentUser = null;
     sessionStorage.removeItem('currentUser');
     document.getElementById('main-app').classList.add('hidden');
@@ -1427,7 +1222,7 @@ async function logout() {
 }
 
 function checkSession() {
-    if (isAuthReady()) {
+    if (window.isAuthReady && window.isAuthReady()) {
         let sessionInitialized = false; // flag: cegah _showMainApp dipanggil lebih dari sekali
 
         window.firebaseOnAuthStateChanged(window.auth, async (firebaseUser) => {
@@ -1478,7 +1273,14 @@ function checkSession() {
 // 4. HELPER — tampilkan main app
 // Fungsi baru.
 // ====================================
-function _showMainApp(user) {
+async function _showMainApp(user) {
+    showLoading(true); // Tampilkan loading sekali di sini
+    try {
+        await initDataCache(); // Jalankan inisialisasi
+    } finally {
+        showLoading(false); // Hilangkan loading setelah selesai (termasuk saat error)
+    }
+
     document.getElementById('login-page').classList.add('hidden');
     document.getElementById('main-app').classList.remove('hidden');
     document.getElementById('user-name').textContent = user.nama;
@@ -1487,8 +1289,6 @@ function _showMainApp(user) {
     applyViewOnlyRestrictions();
     initDashboard();
     loadNotifications();
-    // Check birthday notifications after data is loaded
-    setTimeout(() => checkBirthdayNotifications(), 1500);
 }
 
 function applyViewOnlyRestrictions() {
@@ -1546,7 +1346,6 @@ function togglePassword() {
 
 // Login form handler
 document.addEventListener('DOMContentLoaded', async function () {
-    await initDataCache();
     applyLanguage();
     checkSession();
 
@@ -2193,7 +1992,7 @@ function editDonation(id) {
     }
 }
 
-async function saveDonation(e) {
+function saveDonation(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -2223,24 +2022,16 @@ async function saveDonation(e) {
     if (editingDonationId) {
         const index = data.donations.findIndex(d => d.id === editingDonationId);
         if (index !== -1) {
-            const updated = { ...data.donations[index], ...donationData };
-            data.donations[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.DONATIONS, String(editingDonationId), updated);
-            }
+            data.donations[index] = { ...data.donations[index], ...donationData };
             showToast(currentLanguage === 'id' ? 'Donasi berhasil diupdate' : 'Donation updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.donations.map(d => d.id), 0) + 1;
-        const newDonation = { id: newId, ...donationData };
-        data.donations.push(newDonation);
-
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.DONATIONS, String(newId), newDonation);
-        }
+        data.donations.push({ id: newId, ...donationData });
 
         const donor = data.members.find(m => m.id === donationData.donorId);
         const tipeDisplay = donationTipe === 'lainnya' && customType ? customType : donationTipe;
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'donation',
@@ -2264,15 +2055,12 @@ function deleteDonation(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus donasi ini?' : 'Are you sure you want to delete this donation?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus donasi ini?' : 'Are you sure you want to delete this donation?', () => {
         const data = getData();
         const index = data.donations.findIndex(d => d.id === id);
 
         if (index !== -1) {
             data.donations.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.DONATIONS, String(id));
-            }
             saveData(data);
             renderDonationsTable();
             initDashboard();
@@ -2494,7 +2282,7 @@ function editEvent(id) {
     }
 }
 
-async function saveEvent(e) {
+function saveEvent(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -2521,22 +2309,14 @@ async function saveEvent(e) {
     if (editingEventId) {
         const index = data.events.findIndex(ev => ev.id === editingEventId);
         if (index !== -1) {
-            const updated = { ...data.events[index], ...eventData };
-            data.events[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.EVENTS, String(editingEventId), updated);
-            }
+            data.events[index] = { ...data.events[index], ...eventData };
             showToast(currentLanguage === 'id' ? 'Event berhasil diupdate' : 'Event updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.events.map(ev => ev.id), 0) + 1;
-        const newEvent = { id: newId, ...eventData, participants: [] };
-        data.events.push(newEvent);
+        data.events.push({ id: newId, ...eventData, participants: [] });
 
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.EVENTS, String(newId), newEvent);
-        }
-
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'event',
@@ -2560,15 +2340,12 @@ function deleteEvent(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus event ini?' : 'Are you sure you want to delete this event?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus event ini?' : 'Are you sure you want to delete this event?', () => {
         const data = getData();
         const index = data.events.findIndex(e => e.id === id);
 
         if (index !== -1) {
             data.events.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.EVENTS, String(id));
-            }
             saveData(data);
             renderEventsGrid();
             initDashboard();
@@ -2638,7 +2415,7 @@ function addParticipant() {
     openModal('modal-manual-participant');
 }
 
-async function saveManualParticipant(e) {
+function saveManualParticipant(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -2647,7 +2424,7 @@ async function saveManualParticipant(e) {
     }
 
     const data = getData();
-    const event = data.events.find(ev => ev.id === currentEventId);
+    const event = data.events.find(e => e.id === currentEventId);
 
     if (!event) {
         showToast(currentLanguage === 'id' ? 'Event tidak ditemukan' : 'Event not found', 'error');
@@ -2668,10 +2445,6 @@ async function saveManualParticipant(e) {
     }
 
     event.participants.push(participantData);
-
-    if (isFirebaseReady()) {
-        await window.setDocument(window.DB_COLLECTIONS.EVENTS, String(currentEventId), event);
-    }
     saveData(data);
 
     closeModal('modal-manual-participant');
@@ -2686,14 +2459,11 @@ function removeParticipant(index) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Hapus peserta ini?' : 'Remove this participant?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Hapus peserta ini?' : 'Remove this participant?', () => {
         const data = getData();
-        const event = data.events.find(ev => ev.id === currentEventId);
+        const event = data.events.find(e => e.id === currentEventId);
         if (event && event.participants) {
             event.participants.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.EVENTS, String(currentEventId), event);
-            }
             saveData(data);
             renderParticipantsTable();
             renderEventsGrid();
@@ -2897,7 +2667,7 @@ function editVolunteer(id) {
     }
 }
 
-async function saveVolunteer(e) {
+function saveVolunteer(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -2947,20 +2717,12 @@ async function saveVolunteer(e) {
     if (editingVolunteerId) {
         const index = data.volunteers.findIndex(v => v.id === editingVolunteerId);
         if (index !== -1) {
-            const updated = { ...data.volunteers[index], ...volunteerData };
-            data.volunteers[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.VOLUNTEERS, String(editingVolunteerId), updated);
-            }
+            data.volunteers[index] = { ...data.volunteers[index], ...volunteerData };
             showToast(currentLanguage === 'id' ? 'Relawan berhasil diupdate' : 'Volunteer updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.volunteers.map(v => v.id), 0) + 1;
-        const newVolunteer = { id: newId, ...volunteerData };
-        data.volunteers.push(newVolunteer);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.VOLUNTEERS, String(newId), newVolunteer);
-        }
+        data.volunteers.push({ id: newId, ...volunteerData });
         showToast(currentLanguage === 'id' ? 'Relawan berhasil ditambahkan' : 'Volunteer added successfully', 'success');
     }
 
@@ -2976,15 +2738,12 @@ function deleteVolunteer(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus relawan ini?' : 'Are you sure you want to delete this volunteer?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus relawan ini?' : 'Are you sure you want to delete this volunteer?', () => {
         const data = getData();
         const index = data.volunteers.findIndex(v => v.id === id);
 
         if (index !== -1) {
             data.volunteers.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.VOLUNTEERS, String(id));
-            }
             saveData(data);
             renderVolunteersGrid();
             initDashboard();
@@ -3276,6 +3035,7 @@ async function saveMember(e) {
             await window.setDocument(window.DB_COLLECTIONS.MEMBERS, String(newId), newMember);
         }
 
+        if (!data.activities) data.activities = [];
         data.activities.unshift({
             id: Date.now(),
             type: 'member',
@@ -3477,7 +3237,7 @@ function editFamily(id) {
     }
 }
 
-async function saveFamily(e) {
+function saveFamily(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -3500,20 +3260,12 @@ async function saveFamily(e) {
     if (editingFamilyId) {
         const index = data.families.findIndex(f => f.id === editingFamilyId);
         if (index !== -1) {
-            const updated = { ...data.families[index], ...familyData };
-            data.families[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.FAMILIES, String(editingFamilyId), updated);
-            }
+            data.families[index] = { ...data.families[index], ...familyData };
             showToast(currentLanguage === 'id' ? 'Keluarga berhasil diupdate' : 'Family updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.families.map(f => f.id), 0) + 1;
-        const newFamily = { id: newId, ...familyData };
-        data.families.push(newFamily);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.FAMILIES, String(newId), newFamily);
-        }
+        data.families.push({ id: newId, ...familyData });
         showToast(currentLanguage === 'id' ? 'Keluarga berhasil ditambahkan' : 'Family added successfully', 'success');
     }
 
@@ -3528,15 +3280,12 @@ function deleteFamily(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus keluarga ini?' : 'Are you sure you want to delete this family?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus keluarga ini?' : 'Are you sure you want to delete this family?', () => {
         const data = getData();
         const index = data.families.findIndex(f => f.id === id);
 
         if (index !== -1) {
             data.families.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.FAMILIES, String(id));
-            }
             saveData(data);
             renderFamiliesGrid();
             showToast(currentLanguage === 'id' ? 'Keluarga berhasil dihapus' : 'Family deleted successfully', 'success');
@@ -3696,7 +3445,7 @@ function editGroup(id) {
     }
 }
 
-async function saveGroup(e) {
+function saveGroup(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -3716,20 +3465,12 @@ async function saveGroup(e) {
     if (editingGroupId) {
         const index = data.groups.findIndex(g => g.id === editingGroupId);
         if (index !== -1) {
-            const updated = { ...data.groups[index], ...groupData };
-            data.groups[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.GROUPS, String(editingGroupId), updated);
-            }
+            data.groups[index] = { ...data.groups[index], ...groupData };
             showToast(currentLanguage === 'id' ? 'Group berhasil diupdate' : 'Group updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.groups.map(g => g.id), 0) + 1;
-        const newGroup = { id: newId, ...groupData, anggota: [], createdAt: new Date().toISOString() };
-        data.groups.push(newGroup);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.GROUPS, String(newId), newGroup);
-        }
+        data.groups.push({ id: newId, ...groupData, anggota: [], createdAt: new Date().toISOString() });
         showToast(currentLanguage === 'id' ? 'Group berhasil ditambahkan' : 'Group added successfully', 'success');
     }
 
@@ -3745,15 +3486,12 @@ function deleteGroup(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus group ini?' : 'Are you sure you want to delete this group?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus group ini?' : 'Are you sure you want to delete this group?', () => {
         const data = getData();
         const index = data.groups.findIndex(g => g.id === id);
 
         if (index !== -1) {
             data.groups.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.GROUPS, String(id));
-            }
             saveData(data);
             renderGroupsGrid();
             initDashboard();
@@ -3855,7 +3593,7 @@ function populateAvailableMembersSelect() {
         availableMembers.map(m => `<option value="${m.id}">${m.nama}</option>`).join('');
 }
 
-async function addMemberToGroup() {
+function addMemberToGroup() {
     if (isViewOnly()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menambah anggota' : 'You do not have permission to add members', 'error');
         return;
@@ -3875,9 +3613,6 @@ async function addMemberToGroup() {
     if (group) {
         if (!group.anggota.includes(memberId)) {
             group.anggota.push(memberId);
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.GROUPS, String(currentGroupId), group);
-            }
             saveData(data);
             renderGroupMembersList();
             populateAvailableMembersSelect();
@@ -3890,7 +3625,7 @@ async function addMemberToGroup() {
     }
 }
 
-async function removeMemberFromGroup(memberId) {
+function removeMemberFromGroup(memberId) {
     if (isViewOnly()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus anggota' : 'You do not have permission to remove members', 'error');
         return;
@@ -3915,9 +3650,6 @@ async function removeMemberFromGroup(memberId) {
                 group.leaderId = null;
             }
 
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.GROUPS, String(currentGroupId), group);
-            }
             saveData(data);
             renderGroupMembersList();
             populateAvailableMembersSelect();
@@ -4046,7 +3778,7 @@ function editAssignment(id) {
     }
 }
 
-async function saveAssignment(e) {
+function saveAssignment(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -4069,20 +3801,12 @@ async function saveAssignment(e) {
     if (editingAssignmentId) {
         const index = data.assignments.findIndex(a => a.id === editingAssignmentId);
         if (index !== -1) {
-            const updated = { ...data.assignments[index], ...assignmentData };
-            data.assignments[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.ASSIGNMENTS, String(editingAssignmentId), updated);
-            }
+            data.assignments[index] = { ...data.assignments[index], ...assignmentData };
             showToast(currentLanguage === 'id' ? 'Penugasan berhasil diupdate' : 'Assignment updated successfully', 'success');
         }
     } else {
         const newId = Math.max(...data.assignments.map(a => a.id), 0) + 1;
-        const newAssignment = { id: newId, ...assignmentData };
-        data.assignments.push(newAssignment);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.ASSIGNMENTS, String(newId), newAssignment);
-        }
+        data.assignments.push({ id: newId, ...assignmentData });
         showToast(currentLanguage === 'id' ? 'Penugasan berhasil ditambahkan' : 'Assignment added successfully', 'success');
     }
 
@@ -4098,15 +3822,12 @@ function deleteAssignment(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus penugasan ini?' : 'Are you sure you want to delete this assignment?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus penugasan ini?' : 'Are you sure you want to delete this assignment?', () => {
         const data = getData();
         const index = data.assignments.findIndex(a => a.id === id);
 
         if (index !== -1) {
             data.assignments.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.ASSIGNMENTS, String(id));
-            }
             saveData(data);
             renderAssignmentsList();
             showToast(currentLanguage === 'id' ? 'Penugasan berhasil dihapus' : 'Assignment deleted successfully', 'success');
@@ -4321,7 +4042,7 @@ function showAddAnnouncementModal() {
     openModal('modal-announcement');
 }
 
-async function saveAnnouncement(e) {
+function saveAnnouncement(e) {
     e.preventDefault();
 
     if (isViewOnly()) {
@@ -4330,9 +4051,8 @@ async function saveAnnouncement(e) {
     }
 
     const data = getData();
-    const newId = Date.now();
     const newAnnouncement = {
-        id: newId,
+        id: Date.now(),
         judul: document.getElementById('announcement-judul').value,
         konten: document.getElementById('announcement-konten').value,
         tanggal: new Date().toISOString().split('T')[0],
@@ -4342,9 +4062,6 @@ async function saveAnnouncement(e) {
     };
 
     data.announcements.push(newAnnouncement);
-    if (isFirebaseReady()) {
-        await window.setDocument(window.DB_COLLECTIONS.ANNOUNCEMENTS, String(newId), newAnnouncement);
-    }
     saveData(data);
 
     closeModal('modal-announcement');
@@ -4358,15 +4075,12 @@ function deleteAnnouncement(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus pengumuman ini?' : 'Are you sure you want to delete this announcement?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus pengumuman ini?' : 'Are you sure you want to delete this announcement?', () => {
         const data = getData();
         const index = data.announcements.findIndex(a => a.id === id);
 
         if (index !== -1) {
             data.announcements.splice(index, 1);
-            if (isFirebaseReady()) {
-                await window.deleteDocument(window.DB_COLLECTIONS.ANNOUNCEMENTS, String(id));
-            }
             saveData(data);
             renderAnnouncementsList();
             showToast(currentLanguage === 'id' ? 'Pengumuman berhasil dihapus' : 'Announcement deleted successfully', 'success');
@@ -5066,7 +4780,7 @@ function editUser(id) {
     openModal('modal-user');
 }
 
-async function saveUser(e) {
+function saveUser(e) {
     e.preventDefault();
 
     // Get form values
@@ -5100,8 +4814,8 @@ async function saveUser(e) {
         }
 
         // Password required for new user
-        if (!password || password.length < 6) {
-            showToast(currentLanguage === 'id' ? 'Password minimal 6 karakter' : 'Password must be at least 6 characters', 'error');
+        if (!password || password.length < 4) {
+            showToast(currentLanguage === 'id' ? 'Password minimal 4 karakter' : 'Password must be at least 4 characters', 'error');
             return;
         }
     }
@@ -5137,82 +4851,36 @@ async function saveUser(e) {
             }
 
             // Update password only if provided
-            if (password && password.length >= 6) {
+            if (password && password.length >= 4) {
                 userData.password = password;
-            } else if (password && password.length < 6) {
-                showToast(currentLanguage === 'id' ? 'Password minimal 6 karakter' : 'Password must be at least 6 characters', 'error');
+            } else if (password && password.length < 4) {
+                showToast(currentLanguage === 'id' ? 'Password minimal 4 karakter' : 'Password must be at least 4 characters', 'error');
                 return;
             } else {
                 userData.password = data.users[index].password;
             }
 
-            const updatedUser = { ...data.users[index], ...userData };
-            data.users[index] = updatedUser;
-
-            // Sync to Firestore users/{uid} if uid exists
-            if (isFirebaseReady() && updatedUser.uid) {
-                await window.setUserProfile(updatedUser.uid, {
-                    nama: updatedUser.nama,
-                    username: updatedUser.username,
-                    role: updatedUser.role,
-                    status: updatedUser.status
-                });
-            }
-
+            data.users[index] = { ...data.users[index], ...userData };
             saveData(data);
             closeModal('modal-user');
             renderUsersGrid();
             showToast(currentLanguage === 'id' ? 'User berhasil diupdate' : 'User updated successfully', 'success');
         }
     } else {
-        // Add new user via Firebase Auth + Firestore
-        if (isFirebaseReady() && isAuthReady()) {
-            showLoading(true);
-            try {
-                const newProfile = await window.createChurchUser({
-                    nama,
-                    username,
-                    email,
-                    password,
-                    role
-                });
-                if (newProfile) {
-                    // Also mirror into local dataCache so UI refreshes
-                    const localUser = {
-                        id: Date.now(),
-                        uid: newProfile.uid,
-                        nama: newProfile.nama,
-                        username: newProfile.username,
-                        email: newProfile.email,
-                        role: newProfile.role,
-                        status: newProfile.status,
-                        avatar: null,
-                        lastLogin: null
-                    };
-                    data.users.push(localUser);
-                    saveData(data);
-                    closeModal('modal-user');
-                    renderUsersGrid();
-                    showToast(currentLanguage === 'id' ? 'User berhasil ditambahkan' : 'User added successfully', 'success');
-                } else {
-                    showToast(currentLanguage === 'id' ? 'Gagal membuat user. Email mungkin sudah terdaftar.' : 'Failed to create user. Email may already be in use.', 'error');
-                }
-            } catch (err) {
-                showToast(currentLanguage === 'id' ? 'Gagal membuat user: ' + err.message : 'Failed to create user: ' + err.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        } else {
-            // Offline fallback
-            userData.password = password;
-            const newId = Math.max(...data.users.map(u => u.id), 0) + 1;
-            const newUser = { id: newId, ...userData, avatar: null, lastLogin: null };
-            data.users.push(newUser);
-            saveData(data);
-            closeModal('modal-user');
-            renderUsersGrid();
-            showToast(currentLanguage === 'id' ? 'User berhasil ditambahkan' : 'User added successfully', 'success');
-        }
+        // Add new user
+        userData.password = password;
+        const newId = Math.max(...data.users.map(u => u.id), 0) + 1;
+        const newUser = {
+            id: newId,
+            ...userData,
+            avatar: null,
+            lastLogin: null
+        };
+        data.users.push(newUser);
+        saveData(data);
+        closeModal('modal-user');
+        renderUsersGrid();
+        showToast(currentLanguage === 'id' ? 'User berhasil ditambahkan' : 'User added successfully', 'success');
     }
 }
 
@@ -5222,23 +4890,12 @@ function deleteUser(id) {
         return;
     }
 
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus user ini?' : 'Are you sure you want to delete this user?', async () => {
+    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus user ini?' : 'Are you sure you want to delete this user?', () => {
         const data = getData();
-        const userToDelete = data.users.find(u => u.id === id);
         const index = data.users.findIndex(u => u.id === id);
 
         if (index !== -1) {
             data.users.splice(index, 1);
-
-            // Delete from Firestore users/{uid} if uid is known
-            if (isFirebaseReady() && userToDelete && userToDelete.uid) {
-                try {
-                    await window.firebaseDeleteDoc(window.firebaseDoc(window.db, 'users', userToDelete.uid));
-                } catch (err) {
-                    console.warn('[APP] Could not delete user from Firestore:', err);
-                }
-            }
-
             saveData(data);
             renderUsersGrid();
             showToast(currentLanguage === 'id' ? 'User berhasil dihapus' : 'User deleted successfully', 'success');
@@ -5353,91 +5010,17 @@ function showToast(message, type = 'info') {
 // NOTIFICATION SYSTEM
 // ========================================
 
-// ========================================
-// BIRTHDAY NOTIFICATIONS
-// ========================================
-
-async function checkBirthdayNotifications() {
-    try {
-        const data = getData();
-        if (!data || !data.members) return;
-
-        const today = new Date();
-        const todayMonth = today.getMonth() + 1; // 1-12
-        const todayDay   = today.getDate();
-
-        // Window: today + next 7 days
-        const upcoming = [];
-        for (let offset = 0; offset <= 7; offset++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() + offset);
-            upcoming.push({ month: d.getMonth() + 1, day: d.getDate(), offset });
-        }
-
-        const activeMembers = data.members.filter(m => m.status === 'aktif' && m.tglLahir);
-
-        for (const member of activeMembers) {
-            const bday = new Date(member.tglLahir);
-            if (isNaN(bday.getTime())) continue;
-
-            const bdayMonth = bday.getMonth() + 1;
-            const bdayDay   = bday.getDate();
-
-            const match = upcoming.find(u => u.month === bdayMonth && u.day === bdayDay);
-            if (!match) continue;
-
-            const age = today.getFullYear() - bday.getFullYear();
-
-            // Deduplicate: skip if a birthday notif for this member+date already exists today
-            const notifKey = `birthday-${member.id}-${today.getFullYear()}-${bdayMonth}-${bdayDay}`;
-            const alreadySent = localStorage.getItem(notifKey);
-            if (alreadySent) continue;
-
-            let title, message, type;
-            if (match.offset === 0) {
-                title   = `🎂 Ulang Tahun Hari Ini!`;
-                message = `${member.nama} berulang tahun hari ini (${age} tahun). Jangan lupa ucapkan selamat!`;
-                type    = 'birthday';
-            } else {
-                title   = `🎁 Ulang Tahun ${match.offset} Hari Lagi`;
-                message = `${member.nama} akan berulang tahun pada ${formatDate(member.tglLahir)} (${age} tahun).`;
-                type    = 'birthday';
-            }
-
-            // Save to Firestore / local
-            if (isFirebaseReady() && window.addNotification) {
-                await window.addNotification({
-                    title,
-                    message,
-                    type,
-                    memberId: member.id,
-                    timestamp: new Date().toISOString(),
-                    read: false
-                });
-            } else {
-                // Local-only push
-                notifications.unshift({
-                    id: notifKey,
-                    title,
-                    message,
-                    type,
-                    timestamp: new Date().toISOString(),
-                    read: false
-                });
-            }
-
-            // Mark as sent for today to avoid duplicates on re-login
-            localStorage.setItem(notifKey, '1');
-        }
-
-        await loadNotifications();
-    } catch (err) {
-        console.error('[APP] checkBirthdayNotifications:', err);
-    }
-}
-
 let notifications = [];
 let unreadCount = 0;
+
+// Helper untuk real-time patch layer (realtime-firebase.js)
+// Memperbarui state notifikasi tanpa re-fetch ke Firebase
+window._setNotificationsState = function(sorted) {
+    notifications = sorted || [];
+    unreadCount = notifications.filter(n => !n.read).length;
+    updateNotificationBadge();
+    renderNotifications();
+};
 
 // Load notifications from Firebase
 async function loadNotifications() {
@@ -5591,8 +5174,7 @@ function renderNotifications() {
         const isRead = n.read ? 'read' : 'unread';
         const icon = n.type === 'success' ? 'fa-check-circle' :
             n.type === 'error' ? 'fa-times-circle' :
-                n.type === 'warning' ? 'fa-exclamation-triangle' :
-                    n.type === 'birthday' ? 'fa-birthday-cake' : 'fa-info-circle';
+                n.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
         const time = formatTimeAgo(n.timestamp);
 
         return `
@@ -5813,12 +5395,7 @@ function showFinanceTab(tabName, clickedBtn) {
 
     // Update tab content
     document.querySelectorAll('.finance-tab-content').forEach(content => content.classList.remove('active'));
-    const targetTab = document.getElementById('finance-' + tabName);
-    if (!targetTab) {
-        console.error('Finance tab tidak ditemukan:', 'finance-' + tabName);
-        return;
-    }
-    targetTab.classList.add('active');
+    document.getElementById('finance-' + tabName).classList.add('active');
 
     // Refresh content based on tab
     if (tabName === 'dashboard') {
@@ -6483,7 +6060,7 @@ function editKategori(id) {
 }
 
 // Save Functions
-async function savePemasukan() {
+function savePemasukan() {
     // Check permission - only admin and superadmin can edit
     if (isViewOnly()) {
         showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
@@ -6507,11 +6084,12 @@ async function savePemasukan() {
         }
         // Create new category
         const newKategoriId = data.financeCategories.length > 0 ? Math.max(...data.financeCategories.map(k => k.id)) + 1 : 1;
-        const newKategori = { id: newKategoriId, nama: customKategori, tipe: 'pemasukan', deskripsi: 'Kategori manual' };
-        data.financeCategories.push(newKategori);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.FINANCE_CATEGORIES, String(newKategoriId), newKategori);
-        }
+        data.financeCategories.push({
+            id: newKategoriId,
+            nama: customKategori,
+            tipe: 'pemasukan',
+            deskripsi: 'Kategori manual'
+        });
         kategoriId = newKategoriId;
     } else {
         kategoriId = parseInt(kategoriId);
@@ -6526,7 +6104,7 @@ async function savePemasukan() {
         // Update
         const index = data.pemasukan.findIndex(p => p.id == id);
         if (index !== -1) {
-            const updated = {
+            data.pemasukan[index] = {
                 ...data.pemasukan[index],
                 kategoriId,
                 jumlah,
@@ -6534,15 +6112,11 @@ async function savePemasukan() {
                 donaturId: donaturId ? parseInt(donaturId) : null,
                 keterangan
             };
-            data.pemasukan[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.PEMASUKAN, String(id), updated);
-            }
         }
     } else {
         // Create new
         const newId = data.pemasukan.length > 0 ? Math.max(...data.pemasukan.map(p => p.id)) + 1 : 1;
-        const newItem = {
+        data.pemasukan.push({
             id: newId,
             kategoriId,
             jumlah,
@@ -6552,11 +6126,7 @@ async function savePemasukan() {
             status: 'pending',
             approvedBy: null,
             approvedAt: null
-        };
-        data.pemasukan.push(newItem);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.PEMASUKAN, String(newId), newItem);
-        }
+        });
     }
 
     saveData(data);
@@ -6567,7 +6137,7 @@ async function savePemasukan() {
     showToast('Pemasukan berhasil disimpan', 'success');
 }
 
-async function savePengeluaran() {
+function savePengeluaran() {
     // Check permission - only admin and superadmin can edit
     if (isViewOnly()) {
         showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
@@ -6590,11 +6160,12 @@ async function savePengeluaran() {
         }
         // Create new category
         const newKategoriId = data.financeCategories.length > 0 ? Math.max(...data.financeCategories.map(k => k.id)) + 1 : 1;
-        const newKategori = { id: newKategoriId, nama: customKategori, tipe: 'pengeluaran', deskripsi: 'Kategori manual' };
-        data.financeCategories.push(newKategori);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.FINANCE_CATEGORIES, String(newKategoriId), newKategori);
-        }
+        data.financeCategories.push({
+            id: newKategoriId,
+            nama: customKategori,
+            tipe: 'pengeluaran',
+            deskripsi: 'Kategori manual'
+        });
         kategoriId = newKategoriId;
     } else {
         kategoriId = parseInt(kategoriId);
@@ -6609,16 +6180,18 @@ async function savePengeluaran() {
         // Update
         const index = data.pengeluaran.findIndex(p => p.id == id);
         if (index !== -1) {
-            const updated = { ...data.pengeluaran[index], kategoriId, jumlah, tanggal, keterangan };
-            data.pengeluaran[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.PENGELUARAN, String(id), updated);
-            }
+            data.pengeluaran[index] = {
+                ...data.pengeluaran[index],
+                kategoriId,
+                jumlah,
+                tanggal,
+                keterangan
+            };
         }
     } else {
         // Create new
         const newId = data.pengeluaran.length > 0 ? Math.max(...data.pengeluaran.map(p => p.id)) + 1 : 1;
-        const newItem = {
+        data.pengeluaran.push({
             id: newId,
             kategoriId,
             jumlah,
@@ -6627,11 +6200,7 @@ async function savePengeluaran() {
             status: 'pending',
             approvedBy: null,
             approvedAt: null
-        };
-        data.pengeluaran.push(newItem);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.PENGELUARAN, String(newId), newItem);
-        }
+        });
     }
 
     saveData(data);
@@ -6642,7 +6211,7 @@ async function savePengeluaran() {
     showToast('Pengeluaran berhasil disimpan', 'success');
 }
 
-async function saveKategori() {
+function saveKategori() {
     // Check permission - only admin and superadmin can edit
     if (isViewOnly()) {
         showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
@@ -6664,20 +6233,22 @@ async function saveKategori() {
         // Update
         const index = data.financeCategories.findIndex(k => k.id == id);
         if (index !== -1) {
-            const updated = { ...data.financeCategories[index], nama, tipe, deskripsi };
-            data.financeCategories[index] = updated;
-            if (isFirebaseReady()) {
-                await window.setDocument(window.DB_COLLECTIONS.FINANCE_CATEGORIES, String(id), updated);
-            }
+            data.financeCategories[index] = {
+                ...data.financeCategories[index],
+                nama,
+                tipe,
+                deskripsi
+            };
         }
     } else {
         // Create new
         const newId = data.financeCategories.length > 0 ? Math.max(...data.financeCategories.map(k => k.id)) + 1 : 1;
-        const newKategori = { id: newId, nama, tipe, deskripsi };
-        data.financeCategories.push(newKategori);
-        if (isFirebaseReady()) {
-            await window.setDocument(window.DB_COLLECTIONS.FINANCE_CATEGORIES, String(newId), newKategori);
-        }
+        data.financeCategories.push({
+            id: newId,
+            nama,
+            tipe,
+            deskripsi
+        });
     }
 
     saveData(data);
@@ -6695,12 +6266,9 @@ function deletePemasukan(id) {
         return;
     }
 
-    showConfirm('Apakah Anda yakin ingin menghapus pemasukan ini?', async () => {
+    showConfirm('Apakah Anda yakin ingin menghapus pemasukan ini?', () => {
         const data = getData();
         data.pemasukan = data.pemasukan.filter(p => p.id !== id);
-        if (isFirebaseReady()) {
-            await window.deleteDocument(window.DB_COLLECTIONS.PEMASUKAN, String(id));
-        }
         saveData(data);
         renderPemasukan();
         updateFinanceSummary();
@@ -6715,12 +6283,9 @@ function deletePengeluaran(id) {
         return;
     }
 
-    showConfirm('Apakah Anda yakin ingin menghapus pengeluaran ini?', async () => {
+    showConfirm('Apakah Anda yakin ingin menghapus pengeluaran ini?', () => {
         const data = getData();
         data.pengeluaran = data.pengeluaran.filter(p => p.id !== id);
-        if (isFirebaseReady()) {
-            await window.deleteDocument(window.DB_COLLECTIONS.PENGELUARAN, String(id));
-        }
         saveData(data);
         renderPengeluaran();
         updateFinanceSummary();
@@ -6735,12 +6300,9 @@ function deleteKategori(id) {
         return;
     }
 
-    showConfirm('Apakah Anda yakin ingin menghapus kategori ini?', async () => {
+    showConfirm('Apakah Anda yakin ingin menghapus kategori ini?', () => {
         const data = getData();
         data.financeCategories = data.financeCategories.filter(k => k.id !== id);
-        if (isFirebaseReady()) {
-            await window.deleteDocument(window.DB_COLLECTIONS.FINANCE_CATEGORIES, String(id));
-        }
         saveData(data);
         renderKategori();
         populateKategoriSelects();
@@ -7033,208 +6595,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-async function handleAddMember(formData) {
-    try {
-        const memberId = await saveMemberToFirebase(null, {
-            nama: formData.nama,
-            email: formData.email,
-            phone: formData.phone,
-            gender: formData.gender,
-            status: formData.status,
-            group: formData.group,
-            createdAt: new Date().toISOString()
-        });
-        
-        // Reload members list
-        await loadAllDataFromFirebase();
-        displayMembers();
-        closeModalAddMember(); // or similar
-        showToast('Member added successfully', 'success');
-    } catch (e) {
-        console.error('Error adding member:', e);
-    }
-}
-
-async function deleteMember(id) {
-    if (!confirm('Delete this member?')) return;
-    try {
-        await deleteMemberFromFirebase(id);
-        await loadAllDataFromFirebase();
-        displayMembers();
-        showToast('Member deleted successfully', 'success');
-    } catch (e) {
-        console.error('Error deleting member:', e);
-    }
-}
-
-async function handleApproveFinance(financeId) {
-    try {
-        await saveApprovalToFirebase({
-            financeId: financeId,
-            action: 'approve',
-            approvedBy: getCurrentUserId(),
-            timestamp: new Date().toISOString()
-        });
-        
-        // Update the specific finance record
-        const currentFinance = dataCache.finances.find(f => f.id === financeId);
-        await saveDonationToFirebase(financeId, {
-            ...currentFinance,
-            status: 'approved'
-        });
-        
-        // Reload and refresh dashboard
-        await loadAllDataFromFirebase();
-        displayDashboard();
-        displayFinances();
-        showToast('Approval recorded', 'success');
-    } catch (e) {
-        console.error('Error approving:', e);
-    }
-}
-
-async function handleLoginSuccess(user, churchId) {
-    setActiveChurch(churchId);
-    setActiveUser(user.uid);
-    
-    // Load all data from Firebase BEFORE showing dashboard
-    await loadAllDataFromFirebase();
-    
-    // Now show dashboard
-    showDashboard();
-    displayMembers();
-    displayDashboard();
-}
-
-async function logout() {
-    if (isAuthReady()) {
-        await window.logoutFromFirebase();
-    }
-    
-    // Clear cache
-    dataCache = defaultData;
-    
-    // Redirect to login
-    window.location.href = '/';
-}
-
-// ADD USER
-async function handleAddUser(formData) {
-    try {
-        const userId = await saveUserToFirebase(null, {
-            nama: formData.nama,
-            email: formData.email,
-            role: formData.role,
-            churchId: getActiveChurchId(),
-            createdAt: new Date().toISOString()
-        });
-        
-        await loadAllDataFromFirebase();
-        displayUserManagement();
-        showToast('User added successfully', 'success');
-    } catch (e) {
-        showToast('Error adding user: ' + e.message, 'error');
-    }
-}
-
-// UPDATE USER
-async function handleUpdateUser(userId, formData) {
-    try {
-        await saveUserToFirebase(userId, formData);
-        await loadAllDataFromFirebase();
-        displayUserManagement();
-        showToast('User updated successfully', 'success');
-    } catch (e) {
-        showToast('Error updating user: ' + e.message, 'error');
-    }
-}
-
-// DELETE USER
-async function handleDeleteUser(userId) {
-    if (!confirm('Delete this user?')) return;
-    try {
-        await window.firebaseDeleteDoc('users', userId);
-        await loadAllDataFromFirebase();
-        displayUserManagement();
-        showToast('User deleted successfully', 'success');
-    } catch (e) {
-        showToast('Error deleting user: ' + e.message, 'error');
-    }
-}
-
-async function handleApproveFinance(financeId) {
-    try {
-        // Save approval to history
-        await saveApprovalToFirebase({
-            financeId: financeId,
-            action: 'approve',
-            approvedBy: getActiveUser(),
-            timestamp: new Date().toISOString()
-        });
-        
-        // Update the record status
-        const finance = dataCache.finances.find(f => f.id === financeId);
-        await saveDonationToFirebase(financeId, {
-            ...finance,
-            status: 'approved',
-            approvedAt: new Date().toISOString()
-        });
-        
-        // Reload and refresh UI
-        await loadAllDataFromFirebase();
-        displayDashboard();
-        displayFinances();
-    } catch (e) {
-        showToast('Error: ' + e.message, 'error');
-    }
-}
-
-async function handleRejectFinance(financeId) {
-    const reason = prompt('Rejection reason:');
-    if (!reason) return;
-    
-    try {
-        await saveApprovalToFirebase({
-            financeId: financeId,
-            action: 'reject',
-            reason: reason,
-            rejectedBy: getActiveUser(),
-            timestamp: new Date().toISOString()
-        });
-        
-        const finance = dataCache.finances.find(f => f.id === financeId);
-        await saveDonationToFirebase(financeId, {
-            ...finance,
-            status: 'rejected',
-            rejectionReason: reason,
-            rejectedAt: new Date().toISOString()
-        });
-        
-        await loadAllDataFromFirebase();
-        displayDashboard();
-        displayFinances();
-    } catch (e) {
-        showToast('Error: ' + e.message, 'error');
-    }
-}
-
 // ================================
-// DEATH MANAGEMENT — Firestore version (full CRUD)
+// DEATH MANAGEMENT — Firestore version
 // ================================
-
-let editingDeathId = null;
 
 // toggle form
 function toggleDeathForm() {
     const form = document.getElementById("death-form-container");
-    const isHidden = form.style.display === "none" || form.style.display === "";
-    form.style.display = isHidden ? "block" : "none";
-    if (isHidden && !editingDeathId) {
-        clearDeathForm();
-    }
+    form.style.display = form.style.display === "none" ? "block" : "none";
 }
 
-// save data ke Firestore (add or update)
+// save data ke Firestore
 async function saveDeathData() {
     const nama    = document.getElementById('death-nama').value.trim();
     const tglWafat = document.getElementById('death-wafat').value;
@@ -7244,7 +6615,7 @@ async function saveDeathData() {
         return;
     }
 
-    const deathData = {
+    const newData = {
         nama,
         tglLahir:        document.getElementById('death-lahir').value,
         tglWafat,
@@ -7254,97 +6625,22 @@ async function saveDeathData() {
         waktu:           document.getElementById('death-waktu').value
     };
 
-    if (editingDeathId) {
-        // Update existing
-        const ok = await window.updateDocument('deaths', editingDeathId, deathData);
-        if (ok) {
-            showToast('Data kematian berhasil diupdate', 'success');
-            editingDeathId = null;
-            document.getElementById('death-form-title') && (document.getElementById('death-form-title').textContent = 'Tambah Data');
-            document.getElementById('btn-cancel-death') && (document.getElementById('btn-cancel-death').style.display = 'none');
-        } else {
-            showToast('Gagal mengupdate data', 'error');
-            return;
-        }
+    const result = await window.addDocument('deaths', newData);
+
+    if (result) {
+        showToast('Data kematian berhasil disimpan', 'success');
+        clearDeathForm();
+        renderDeathList();
     } else {
-        // Create new
-        const result = await window.addDocument('deaths', deathData);
-        if (result) {
-            showToast('Data kematian berhasil disimpan', 'success');
-        } else {
-            showToast('Gagal menyimpan data, coba lagi', 'error');
-            return;
-        }
+        showToast('Gagal menyimpan data, coba lagi', 'error');
     }
-
-    clearDeathForm();
-    document.getElementById("death-form-container").style.display = "none";
-    renderDeathList();
-}
-
-// edit — load data ke form
-async function editDeathData(id) {
-    try {
-        const d = await window.getDocumentById('deaths', id);
-        if (!d) { showToast('Data tidak ditemukan', 'error'); return; }
-
-        document.getElementById('death-nama').value    = d.nama    || '';
-        document.getElementById('death-lahir').value   = d.tglLahir || '';
-        document.getElementById('death-wafat').value   = d.tglWafat || '';
-        document.getElementById('death-riwayat').value = d.riwayatPenyakit || '';
-        document.getElementById('death-penyebab').value = d.penyebab || '';
-        document.getElementById('death-tempat').value  = d.tempat  || '';
-        document.getElementById('death-waktu').value   = d.waktu   || '';
-
-        editingDeathId = id;
-        if (document.getElementById('death-form-title')) {
-            document.getElementById('death-form-title').textContent = 'Edit Data';
-        }
-        if (document.getElementById('btn-cancel-death')) {
-            document.getElementById('btn-cancel-death').style.display = 'inline-block';
-        }
-
-        document.getElementById("death-form-container").style.display = "block";
-        document.getElementById("death-form-container").scrollIntoView({ behavior: 'smooth' });
-    } catch (e) {
-        showToast('Gagal memuat data', 'error');
-    }
-}
-
-// cancel edit
-function cancelDeathEdit() {
-    editingDeathId = null;
-    clearDeathForm();
-    document.getElementById("death-form-container").style.display = "none";
-    if (document.getElementById('death-form-title')) {
-        document.getElementById('death-form-title').textContent = 'Tambah Data';
-    }
-    if (document.getElementById('btn-cancel-death')) {
-        document.getElementById('btn-cancel-death').style.display = 'none';
-    }
-}
-
-// delete
-async function deleteDeathData(id) {
-    showConfirm('Apakah Anda yakin ingin menghapus data kematian ini?', async () => {
-        const ok = await window.deleteDocument('deaths', id);
-        if (ok) {
-            showToast('Data kematian berhasil dihapus', 'success');
-            renderDeathList();
-        } else {
-            showToast('Gagal menghapus data', 'error');
-        }
-    });
 }
 
 // clear form
 function clearDeathForm() {
     ['death-nama','death-lahir','death-wafat',
      'death-riwayat','death-penyebab','death-tempat','death-waktu']
-        .forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = "";
-        });
+        .forEach(id => { document.getElementById(id).value = ""; });
 }
 
 // render list dari Firestore
@@ -7357,38 +6653,24 @@ async function renderDeathList() {
     const deaths = await window.getAllDocuments('deaths');
 
     if (!deaths || deaths.length === 0) {
-        container.innerHTML = "<p style='color:#888; text-align:center; padding:20px;'>Belum ada data kematian</p>";
+        container.innerHTML = "<p>Belum ada data kematian</p>";
         return;
     }
 
     // Urutkan terbaru dulu
     deaths.sort((a, b) => new Date(b.tglWafat) - new Date(a.tglWafat));
 
-    const canEditDelete = canEdit();
-
     container.innerHTML = deaths.map(d => `
-        <div class="card" style="padding:15px; margin-bottom:10px; border-left: 4px solid #6c757d;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="flex:1;">
-                    <h3 style="margin:0 0 8px; font-size:16px;">${d.nama}</h3>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:13px; color:#555;">
-                        <p style="margin:2px 0;"><strong>Lahir:</strong> ${d.tglLahir ? formatDate(d.tglLahir) : '-'}</p>
-                        <p style="margin:2px 0;"><strong>Wafat:</strong> ${formatDate(d.tglWafat)}</p>
-                        ${d.penyebab ? `<p style="margin:2px 0;"><strong>Penyebab:</strong> ${d.penyebab}</p>` : ''}
-                        ${d.tempat ? `<p style="margin:2px 0;"><strong>Tempat:</strong> ${d.tempat}</p>` : ''}
-                        ${d.waktu ? `<p style="margin:2px 0;"><strong>Waktu:</strong> ${d.waktu}</p>` : ''}
-                        ${d.riwayatPenyakit ? `<p style="margin:2px 0; grid-column:1/-1;"><strong>Riwayat:</strong> ${d.riwayatPenyakit}</p>` : ''}
-                    </div>
-                </div>
-                ${canEditDelete ? `
-                <div style="display:flex; gap:6px; margin-left:12px;">
-                    <button class="btn-action btn-edit" onclick="editDeathData('${d.id}')" title="Edit" style="padding:6px 10px; font-size:12px; background:#f59e0b; color:white; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-edit"></i></button>
-                    <button class="btn-action btn-delete" onclick="deleteDeathData('${d.id}')" title="Hapus" style="padding:6px 10px; font-size:12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer;"><i class="fas fa-trash"></i></button>
-                </div>
-                ` : ''}
-            </div>
+        <div class="card" style="padding:15px; margin-bottom:10px;">
+            <h3>${d.nama}</h3>
+            <p>Lahir: ${d.tglLahir || '-'}</p>
+            <p>Wafat: ${d.tglWafat}</p>
+            <p>Riwayat: ${d.riwayatPenyakit || '-'}</p>
+            <p>Penyebab: ${d.penyebab || '-'}</p>
+            <p>Tempat: ${d.tempat || '-'}</p>
+            <p>Waktu: ${d.waktu || '-'}</p>
         </div>
-    `).join('');
+    `).join('')
 }
 
 
@@ -7470,6 +6752,14 @@ window.showAddKategoriModal = showAddKategoriModal;
 window.savePemasukan = savePemasukan;
 window.savePengeluaran = savePengeluaran;
 window.saveKategori = saveKategori;
+window.editPemasukan = editPemasukan;
+window.deletePemasukan = deletePemasukan;
+window.editPengeluaran = editPengeluaran;
+window.deletePengeluaran = deletePengeluaran;
+window.editKategori = editKategori;
+window.deleteKategori = deleteKategori;
+window.approveItem = approveItem;
+window.rejectItem = rejectItem;
 window.filterPemasukan = filterPemasukan;
 window.filterPengeluaran = filterPengeluaran;
 window.searchPemasukan = searchPemasukan;
@@ -7478,12 +6768,6 @@ window.searchKategori = searchKategori;
 window.handleFinanceCategoryChange = handleFinanceCategoryChange;
 window.exportFinanceData = exportFinanceData;
 window.updateFinanceChart = updateFinanceChart;
-window.deletePengeluaran = deletePengeluaran;
-window.deletePemasukan = deletePemasukan;
-window.editPengeluaran = editPengeluaran;
-window.editPemasukan = editPemasukan;
-window.approveItem = approveItem;
-window.rejectItem = rejectItem;
 
 // ============================================================
 // VOLUNTEERS
@@ -7527,9 +6811,6 @@ window.searchUsers = searchUsers;
 // ============================================================
 window.toggleDeathForm = toggleDeathForm;
 window.saveDeathData = saveDeathData;
-window.editDeathData = editDeathData;
-window.deleteDeathData = deleteDeathData;
-window.cancelDeathEdit = cancelDeathEdit;
 
 // ============================================================
 // DATA MANAGEMENT
@@ -7537,31 +6818,3 @@ window.cancelDeathEdit = cancelDeathEdit;
 window.backupData = backupData;
 window.restoreData = restoreData;
 window.clearAllData = clearAllData;
-
-window.saveMemberToFirebase = saveMemberToFirebase;
-window.deleteMemberFromFirebase = deleteMemberFromFirebase;
-window.saveFamilyToFirebase = saveFamilyToFirebase;
-window.saveGroupToFirebase = saveGroupToFirebase;
-window.saveEventToFirebase = saveEventToFirebase;
-window.saveAttendanceToFirebase = saveAttendanceToFirebase;
-window.saveDonationToFirebase = saveDonationToFirebase;
-window.saveUserToFirebase = saveUserToFirebase;
-window.saveApprovalToFirebase = saveApprovalToFirebase;
-window.loadAllDataFromFirebase = loadAllDataFromFirebase;
-
-window.firebaseAddDoc = firebaseAddDoc;
-window.firebaseGetAllDocs = firebaseGetAllDocs;
-window.firebaseGetDoc = firebaseGetDoc;
-window.firebaseUpdateDoc = firebaseUpdateDoc;
-window.firebaseDeleteDoc = firebaseDeleteDoc;
-window.firebaseSetDoc = firebaseSetDoc;
-window.registerChurch = registerChurch;
-window.loginUser = loginUser;
-window.logoutFromFirebase = logoutFromFirebase;
-window.listenToCollection = listenToCollection;
-window.getActiveChurchId = getActiveChurchId;
-window.getActiveUser = getActiveUser;
-window.setActiveChurch = setActiveChurch;
-window.setActiveUser = setActiveUser;
-
-console.log('[FIREBASE] All functions exported to window');
