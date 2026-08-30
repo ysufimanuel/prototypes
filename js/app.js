@@ -1365,6 +1365,21 @@ document.addEventListener('DOMContentLoaded', async function () {
             const result = await login(usernameOrEmail, password);
 
             if (result.success) {
+                // ✅ FIX: Fetch & set church sebelum show main app
+                try {
+                    if (result.user && result.user.uid && window.getUserProfile) {
+                        const profile = await window.getUserProfile(result.user.uid);
+                        if (profile && profile.churchId) {
+                            window.setActiveChurch(profile.churchId);
+                            console.log('[LOGIN SUCCESS] Church ID set:', profile.churchId);
+                        } else {
+                            console.warn('[LOGIN] No churchId in profile');
+                        }
+                    }
+                } catch (err) {
+                    console.error('[LOGIN] Error setting church:', err);
+                }
+                
                 notification.className = 'login-notification success';
                 notification.textContent = currentLanguage === 'id' ? 'Login berhasil!' : 'Login successful!';
                 setTimeout(() => _showMainApp(result.user), 800);
