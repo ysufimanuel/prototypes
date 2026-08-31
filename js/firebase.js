@@ -141,6 +141,7 @@ function isAuthReady() {
 async function getAllDocuments(collectionName) {
     if (!isFirebaseReady()) return [];
     try {
+        await waitForChurchId();
         const snap = await window.firebaseGetDocs(churchCol(collectionName));
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch (e) {
@@ -152,6 +153,7 @@ async function getAllDocuments(collectionName) {
 async function getDocumentById(collectionName, docId) {
     if (!isFirebaseReady()) return null;
     try {
+        await waitForChurchId();
         const snap = await window.firebaseGetDoc(churchDocRef(collectionName, docId));
         return snap.exists() ? { id: snap.id, ...snap.data() } : null;
     } catch (e) {
@@ -163,6 +165,7 @@ async function getDocumentById(collectionName, docId) {
 async function addDocument(collectionName, data) {
     if (!isFirebaseReady()) return null;
     try {
+        await waitForChurchId();
         const d = { ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         const ref = await window.firebaseAddDoc(churchCol(collectionName), d);
         return { id: ref.id, ...d };
@@ -175,6 +178,7 @@ async function addDocument(collectionName, data) {
 async function setDocument(collectionName, docId, data) {
     if (!isFirebaseReady()) return false;
     try {
+        await waitForChurchId();
         await window.firebaseSetDoc(
             churchDocRef(collectionName, docId),
             { ...data, updatedAt: new Date().toISOString() },
@@ -584,6 +588,64 @@ const DB_COLLECTIONS = {
 window.DB_COLLECTIONS          = DB_COLLECTIONS;
 window.isFirebaseReady         = isFirebaseReady;
 window.isAuthReady             = isAuthReady;
+
+// ========================================
+// TENANT CONTEXT GUARD (FIX RACE CONDITION)
+// ========================================
+let _churchIdPromiseResolve = null;
+let _churchIdPromise = null;
+
+function _createChurchIdPromise() {
+    return new Promise((resolve) => {
+        _churchIdPromiseResolve = resolve;
+        // Jika churchId sudah ada, langsung resolve
+        if (_activeChurchId) {
+            resolve(_activeChurchId);
+        }
+    });
+}
+
+// Fungsi untuk menunggu churchId tersedia
+function waitForChurchId() {
+    if (_activeChurchId) return Promise.resolve(_activeChurchId);
+    if (!_churchIdPromise) {
+        _churchIdPromise = _createChurchIdPromise();
+    }
+    return _churchIdPromise;
+}
+
+// Panggil ini setiap kali setActiveChurch berhasil
+function _resolveChurchIdPromise() {
+    if (_churchIdPromiseResolve) {
+        _churchIdPromiseResolve(_activeChurchId);
+        _churchIdPromise = null;
+        _churchIdPromiseResolve = null;
+    }
+}
+
+// Override setActiveChurch agar memicu resolve promise
+const _originalSetActiveChurch = setActiveChurch;
+setActiveChurch = function(churchId) {
+    _originalSetActiveChurch(churchId);
+    _resolveChurchIdPromise();
+};
+
+// ========================================
+// ROOT REPOSITORY (Users di root)
+// ========================================
+async function getAllUsersFromRoot() {
+    if (!isFirebaseReady()) return [];
+    try {
+        const snap = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'users'));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+        console.error('[FIREBASE] getAllUsersFromRoot:', e);
+        return [];
+    }
+}
+
+window.waitForChurchId = waitForChurchId;
+window.getAllUsersFromRoot = getAllUsersFromRoot;
 window.setActiveChurch         = setActiveChurch;
 window.getActiveChurchId       = getActiveChurchId;
 window.getAllDocuments          = getAllDocuments;

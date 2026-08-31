@@ -882,6 +882,7 @@ async function loadAllDataFromFirestore() {
     }
 
     try {
+        await window.waitForChurchId(); // Wait for churchId before querying
         console.log('[APP] Fetching all collections...');
 
         const [
@@ -1276,6 +1277,7 @@ function checkSession() {
 async function _showMainApp(user) {
     showLoading(true); // Tampilkan loading sekali di sini
     try {
+        await window.waitForChurchId(); // Ensure churchId is ready
         await initDataCache(); // Jalankan inisialisasi
     } finally {
         showLoading(false); // Hilangkan loading setelah selesai (termasuk saat error)
