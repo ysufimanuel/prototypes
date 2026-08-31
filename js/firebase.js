@@ -374,7 +374,8 @@ async function loginWithFirebase(usernameOrEmail, password) {
         await setUserProfile(credential.user.uid, { lastLogin: new Date().toISOString() });
 
         const { password: _p, ...safe } = profile;
-        return safe;
+        // Include uid in returned object for app.js to use
+        return { ...safe, uid: credential.user.uid };
     } catch (e) {
         console.error('[FIREBASE] loginWithFirebase:', e.code);
         return null;
