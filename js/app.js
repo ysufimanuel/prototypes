@@ -1367,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             const result = await login(usernameOrEmail, password);
 
             if (result.success) {
-                // ✅ FIX: Fetch & set church sebelum show main app
+                // ✅ FIX: Fetch & set church sebelum show main app + VALIDATION
                 try {
                     if (result.user && result.user.uid && window.getUserProfile) {
                         const profile = await window.getUserProfile(result.user.uid);
@@ -1375,11 +1375,18 @@ document.addEventListener('DOMContentLoaded', async function () {
                             window.setActiveChurch(profile.churchId);
                             console.log('[LOGIN SUCCESS] Church ID set:', profile.churchId);
                         } else {
-                            console.warn('[LOGIN] No churchId in profile');
+                            console.error('[LOGIN] Profil tidak memiliki churchId, logout...');
+                            await window.logoutFromFirebase();
+                            notification.textContent = currentLanguage === 'id' ? 'Data user belum lengkap. Hubungi admin.' : 'User data incomplete. Contact admin.';
+                            notification.className = 'login-notification error';
+                            return;
                         }
                     }
                 } catch (err) {
                     console.error('[LOGIN] Error setting church:', err);
+                    notification.textContent = 'Login error. Please try again.';
+                    notification.className = 'login-notification error';
+                    return;
                 }
                 
                 notification.className = 'login-notification success';
