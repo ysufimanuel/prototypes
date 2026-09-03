@@ -363,7 +363,7 @@
         }
 
         window._showMainApp = async function (user) {
-            orig(user); // jalankan logika asli
+            await orig(user); // tunggu logika asli selesai sebelum mulai listeners
 
             // Tunggu churchId aktif lalu mulai listeners
             try {

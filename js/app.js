@@ -1223,51 +1223,56 @@ async function logout() {
 }
 
 function checkSession() {
-    if (window.isAuthReady && window.isAuthReady()) {
-        let sessionInitialized = false; // flag: cegah _showMainApp dipanggil lebih dari sekali
+    const tryInit = () => {
+        if (window.isAuthReady && window.isAuthReady()) {
+            let sessionInitialized = false;
 
-        window.firebaseOnAuthStateChanged(window.auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                // Kalau session sudah diinisialisasi, skip — jangan reload app
-                if (sessionInitialized) {
-                    console.log('[AUTH] Auth state refreshed, session already active — skip');
-                    return;
+            window.firebaseOnAuthStateChanged(window.auth, async (firebaseUser) => {
+                if (firebaseUser) {
+                    if (sessionInitialized) {
+                        console.log('[AUTH] Session sudah aktif, skip');
+                        return;
+                    }
+
+                    try {
+                        const profile = await window.getUserProfile(firebaseUser.uid);
+                        if (profile) {
+                            window.setActiveChurch(profile.churchId);
+
+                            const { password: _p, ...safe } = profile;
+                            currentUser = safe;
+                            sessionStorage.setItem('currentUser', JSON.stringify(safe));
+
+                            await refreshDataCache();
+
+                            sessionInitialized = true;
+                            await _showMainApp(safe);
+                        } else {
+                            console.error('[AUTH] Profil tidak ditemukan untuk uid:', firebaseUser.uid);
+                            await window.logoutFromFirebase();
+                        }
+                    } catch (err) {
+                        console.error('[AUTH] Error saat restore session:', err);
+                        // Tetap di login page jika terjadi error
+                    }
+                } else {
+                    if (sessionInitialized) {
+                        sessionInitialized = false;
+                        sessionStorage.removeItem('currentUser');
+                        currentUser = null;
+                        document.getElementById('main-app').classList.add('hidden');
+                        document.getElementById('login-page').classList.remove('hidden');
+                    }
                 }
+            });
+        } else {
+            // Firebase belum siap, coba lagi setelah 500ms
+            console.log('[AUTH] Menunggu Firebase siap...');
+            setTimeout(tryInit, 500);
+        }
+    };
 
-                const profile = await window.getUserProfile(firebaseUser.uid);
-                if (profile) {
-                    window.setActiveChurch(profile.churchId);
-
-                    const { password: _p, ...safe } = profile;
-                    currentUser = safe;
-                    sessionStorage.setItem('currentUser', JSON.stringify(safe));
-
-                    await refreshDataCache();
-
-                    sessionInitialized = true; // set flag SEBELUM showMainApp
-                    _showMainApp(safe);
-                }
-            } else {
-                // User benar-benar logout
-                if (sessionInitialized) {
-                    // Hanya redirect ke login kalau session sebelumnya aktif
-                    sessionInitialized = false;
-                    sessionStorage.removeItem('currentUser');
-                    currentUser = null;
-                    document.getElementById('main-app').classList.add('hidden');
-                    document.getElementById('login-page').classList.remove('hidden');
-                }
-            }
-        });
-        return;
-    }
-
-    // Fallback sessionStorage
-    const stored = sessionStorage.getItem('currentUser');
-    if (stored) {
-        currentUser = JSON.parse(stored);
-        _showMainApp(currentUser);
-    }
+    tryInit();
 }
 
 // ====================================
@@ -1275,12 +1280,15 @@ function checkSession() {
 // Fungsi baru.
 // ====================================
 async function _showMainApp(user) {
-    showLoading(true); // Tampilkan loading sekali di sini
+    showLoading(true);
     try {
-        await window.waitForChurchId(); // Ensure churchId is ready
-        await initDataCache(); // Jalankan inisialisasi
+        await window.waitForChurchId();
+        await initDataCache();
+    } catch (error) {
+        console.error('[APP] Error init data:', error);
+        showToast('Gagal memuat data', 'error');
     } finally {
-        showLoading(false); // Hilangkan loading setelah selesai (termasuk saat error)
+        showLoading(false);
     }
 
     document.getElementById('login-page').classList.add('hidden');
@@ -5413,13 +5421,20 @@ function initFinance() {
 
 // Show Finance Tab
 function showFinanceTab(tabName, clickedBtn) {
-    // Update tab buttons
-    document.querySelectorAll('.finance-tab').forEach(btn => btn.classList.remove('active'));
+    const tabButtons = document.querySelectorAll('.finance-tab');
+    const tabContents = document.querySelectorAll('.finance-tab-content');
+    const targetContent = document.getElementById('finance-' + tabName);
+
+    if (!targetContent) {
+        console.warn('[FINANCE] Tab content tidak ditemukan:', tabName);
+        return;
+    }
+
+    tabButtons.forEach(btn => btn.classList.remove('active'));
     if (clickedBtn) clickedBtn.classList.add('active');
 
-    // Update tab content
-    document.querySelectorAll('.finance-tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById('finance-' + tabName).classList.add('active');
+    tabContents.forEach(content => content.classList.remove('active'));
+    targetContent.classList.add('active');
 
     // Refresh content based on tab
     if (tabName === 'dashboard') {
