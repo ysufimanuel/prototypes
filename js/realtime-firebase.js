@@ -65,7 +65,7 @@
         pengeluaran: ['initDashboard'],
         financeCategories: [],
         notifications: ['renderNotifications', 'updateNotificationBadge'],
-        approvalHistory: [],
+        approvalHistory: ['renderApprovalTab'],
     };
 
     // =========================================================

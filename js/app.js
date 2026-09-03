@@ -1031,6 +1031,7 @@ async function syncDataToFirestore(data) {
         pemasukan:        data.pemasukan        || [],
         pengeluaran:      data.pengeluaran      || [],
         financeCategories: data.financeCategories || [],
+        approvalHistory:   data.approvalHistory   || [],
     };
 
     const batch = window.firebaseWriteBatch(window.db);
