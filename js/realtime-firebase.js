@@ -363,7 +363,7 @@
         }
 
         window._showMainApp = async function (user) {
-            await orig(user); // tunggu logika asli selesai sebelum mulai listeners
+            orig(user); // jalankan logika asli
 
             // Tunggu churchId aktif lalu mulai listeners
             try {
@@ -452,8 +452,9 @@
         try {
             await waitFor(() =>
                 typeof window._showMainApp === 'function' &&
-                typeof window.loadNotifications === 'function',
-                10000
+                typeof window.loadNotifications === 'function' &&
+                typeof window.showPage === 'function',
+                30000
             );
         } catch (e) {
             console.error('[RTFB] app.js functions tidak ditemukan dalam 10 detik:', e);

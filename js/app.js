@@ -996,11 +996,10 @@ function initDataLocal() {
 
 // Save data to Firestore or localStorage
 async function saveData(data) {
-    // Update cache
     dataCache = data;
 
     if (isFirebaseReady()) {
-        // Firestore saves are handled per-collection in specific functions
+        await syncDataToFirestore(data);
         return true;
     }
 
@@ -1012,6 +1011,55 @@ async function saveData(data) {
         console.error('Error saving data:', e);
         showToast(currentLanguage === 'id' ? 'Gagal menyimpan data' : 'Failed to save data', 'error');
         return false;
+    }
+}
+
+async function syncDataToFirestore(data) {
+    if (!isFirebaseReady() || !window.getActiveChurchId()) return;
+
+    const collections = {
+        members:          data.members          || [],
+        families:         data.families         || [],
+        groups:           data.groups           || [],
+        events:           data.events           || [],
+        attendance:       data.attendance       || [],
+        donations:        data.donations        || [],
+        donors:           data.donors           || [],
+        volunteers:       data.volunteers       || [],
+        assignments:      data.assignments      || [],
+        announcements:    data.announcements    || [],
+        pemasukan:        data.pemasukan        || [],
+        pengeluaran:      data.pengeluaran      || [],
+        financeCategories: data.financeCategories || [],
+    };
+
+    const batch = window.firebaseWriteBatch(window.db);
+
+    for (const [collectionName, items] of Object.entries(collections)) {
+        for (const item of items) {
+            const ref = window.firebaseDoc(
+                window.db,
+                'churches', window.getActiveChurchId(),
+                collectionName, String(item.id)
+            );
+            batch.set(ref, item, { merge: true });
+        }
+    }
+
+    if (data.finance) {
+        const configRef = window.firebaseDoc(
+            window.db,
+            'churches', window.getActiveChurchId(),
+            'financeConfig', 'config'
+        );
+        batch.set(configRef, data.finance, { merge: true });
+    }
+
+    try {
+        await batch.commit();
+        console.log('[APP] Data berhasil disinkronkan ke Firestore');
+    } catch (e) {
+        console.error('[APP] Gagal sinkronisasi batch:', e);
     }
 }
 
@@ -1248,8 +1296,8 @@ function checkSession() {
                             sessionInitialized = true;
                             await _showMainApp(safe);
                         } else {
+                            // Profil tidak ditemukan — jangan auto-logout, biarkan user di login page
                             console.error('[AUTH] Profil tidak ditemukan untuk uid:', firebaseUser.uid);
-                            await window.logoutFromFirebase();
                         }
                     } catch (err) {
                         console.error('[AUTH] Error saat restore session:', err);
