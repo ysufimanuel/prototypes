@@ -4753,6 +4753,10 @@ function downloadFile(content, filename, mimeType) {
 // ========================================
 
 function renderUsersGrid() {
+    if (!canManageUsers()) {
+        return;
+    }
+
     const data = getData();
     const container = document.getElementById('users-grid');
     if (!container) return;
@@ -4792,8 +4796,8 @@ function renderUsersGrid() {
                 <div class="info-row"><i class="fas fa-circle"></i> <span class="badge badge-${u.status === 'aktif' ? 'success' : 'secondary'}">${u.status === 'aktif' ? (currentLanguage === 'id' ? 'Aktif' : 'Active') : (currentLanguage === 'id' ? 'Nonaktif' : 'Inactive')}</span></div>
             </div>
             <div class="card-footer-actions">
-                <button class="btn btn-secondary btn-sm" onclick="editUser(${u.id})"><i class="fas fa-edit"></i> ${currentLanguage === 'id' ? 'Edit' : 'Edit'}</button>
-                ${u.id !== 1 ? `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i> ${currentLanguage === 'id' ? 'Hapus' : 'Delete'}</button>` : ''}
+                <button class="btn btn-secondary btn-sm" onclick="editUser('${u.uid}')"><i class="fas fa-edit"></i> ${currentLanguage === 'id' ? 'Edit' : 'Edit'}</button>
+                ${u.uid !== currentUser.uid ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.uid}')"><i class="fas fa-trash"></i> ${currentLanguage === 'id' ? 'Hapus' : 'Delete'}</button>` : ''}
             </div>
         </div>
     `).join('') || `<p class="text-center" style="grid-column: 1/-1; color: var(--text-muted); padding: 30px;">${currentLanguage === 'id' ? 'Belum ada user' : 'No users yet'}</p>`;
@@ -4804,6 +4808,16 @@ function searchUsers() {
 }
 
 function showAddUserModal() {
+    if (!canManageUsers()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Anda tidak memiliki akses ke User Management'
+                : 'You do not have access to User Management',
+            'error'
+        );
+        return;
+    }
+
     editingUserId = null;
     document.getElementById('modal-user-title').textContent = currentLanguage === 'id' ? 'Tambah User Baru' : 'Add New User';
 
@@ -4831,8 +4845,18 @@ function showAddUserModal() {
 }
 
 function editUser(id) {
+    if (!canManageUsers()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Anda tidak memiliki akses ke User Management'
+                : 'You do not have access to User Management',
+            'error'
+        );
+        return;
+    }
+
     const data = getData();
-    const user = data.users.find(u => u.id === id);
+    const user = data.users.find(u => u.uid === id);
 
     if (!user) {
         showToast(currentLanguage === 'id' ? 'User tidak ditemukan' : 'User not found', 'error');
@@ -4864,7 +4888,15 @@ function editUser(id) {
 function saveUser(e) {
     e.preventDefault();
 
-    // Get form values
+    if (!canManageUsers()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Anda tidak memiliki akses untuk mengelola user'
+                : 'You do not have permission to manage users',
+            'error'
+        );
+        return;
+    }
     const nama = document.getElementById('user-nama').value.trim();
     const username = document.getElementById('user-username').value.trim();
     const email = document.getElementById('user-email').value.trim();
@@ -4911,11 +4943,11 @@ function saveUser(e) {
 
     if (editingUserId) {
         // Edit existing user
-        const index = data.users.findIndex(u => u.id === editingUserId);
+        const index = data.users.findIndex(u => u.uid === editingUserId);
         if (index !== -1) {
             // Check if username changed and already exists
             if (username.toLowerCase() !== data.users[index].username.toLowerCase()) {
-                const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.id !== editingUserId);
+                const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.uid !== editingUserId);
                 if (existingUser) {
                     showToast(currentLanguage === 'id' ? 'Username sudah digunakan' : 'Username already exists', 'error');
                     return;
@@ -4924,7 +4956,7 @@ function saveUser(e) {
 
             // Check if email changed and already exists
             if (email.toLowerCase() !== data.users[index].email.toLowerCase()) {
-                const existingEmail = data.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.id !== editingUserId);
+                const existingEmail = data.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.uid !== editingUserId);
                 if (existingEmail) {
                     showToast(currentLanguage === 'id' ? 'Email sudah digunakan' : 'Email already exists', 'error');
                     return;
@@ -4966,14 +4998,24 @@ function saveUser(e) {
 }
 
 function deleteUser(id) {
-    if (id === 1) {
-        showToast(currentLanguage === 'id' ? 'Super Admin tidak dapat dihapus' : 'Super Admin cannot be deleted', 'error');
+    if (!canManageUsers()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Anda tidak memiliki akses untuk menghapus user'
+                : 'You do not have permission to delete users',
+            'error'
+        );
+        return;
+    }
+
+    if (id === currentUser.uid) {
+        showToast(currentLanguage === 'id' ? 'Tidak dapat menghapus akun Anda sendiri' : 'You cannot delete your own account', 'error');
         return;
     }
 
     showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus user ini?' : 'Are you sure you want to delete this user?', () => {
         const data = getData();
-        const index = data.users.findIndex(u => u.id === id);
+        const index = data.users.findIndex(u => u.uid === id);
 
         if (index !== -1) {
             data.users.splice(index, 1);
