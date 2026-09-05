@@ -432,27 +432,123 @@ async function registerChurch(churchData, adminData) {
 }
 
 async function createChurchUser(userData) {
-    if (!isAuthReady() || !_activeChurchId) return null;
-    try {
-        const credential = await window.firebaseCreateUser(
-            window.auth, userData.email, userData.password
-        );
-        const profile = {
-            uid: credential.user.uid,
-            email: userData.email,
-            nama: userData.nama,
-            username: userData.username || userData.email.split('@')[0],
-            role: userData.role || 'user',
-            churchId: _activeChurchId,
-            status: 'aktif',
-            createdAt: new Date().toISOString(),
-            lastLogin: null
-        };
-        await setUserProfile(credential.user.uid, profile);
-        return profile;
-    } catch (e) {
-        console.error('[FIREBASE] createChurchUser:', e.code);
+    if (!isAuthReady() || !_activeChurchId) {
+        console.error('[FIREBASE] Auth belum siap atau churchId kosong');
         return null;
+    }
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+
+        const response = await fetch('/api/admin/create-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                nama:     userData.nama,
+                username: userData.username,
+                email:    userData.email,
+                password: userData.password,
+                role:     userData.role,
+                churchId: _activeChurchId
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Gagal membuat user.');
+        }
+
+        return result.user;
+
+    } catch (e) {
+        console.error('[FIREBASE] createChurchUser:', e);
+        throw e;
+    }
+}
+
+async function updateChurchUser(uid, userData) {
+    if (!isAuthReady() || !_activeChurchId) {
+        console.error('[FIREBASE] Auth belum siap atau churchId kosong');
+        return null;
+    }
+
+    if (!uid) throw new Error('UID user tidak ditemukan.');
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+
+        const response = await fetch(
+            `/api/admin/users/${encodeURIComponent(uid)}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    nama:     userData.nama,
+                    username: userData.username,
+                    email:    userData.email,
+                    role:     userData.role,
+                    churchId: _activeChurchId
+                })
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Gagal memperbarui user.');
+        }
+
+        return result.user;
+
+    } catch (e) {
+        console.error('[FIREBASE] updateChurchUser:', e);
+        throw e;
+    }
+}
+
+async function deleteChurchUser(uid) {
+    if (!isAuthReady() || !_activeChurchId) {
+        console.error('[FIREBASE] Auth belum siap atau churchId kosong');
+        return null;
+    }
+
+    if (!uid) throw new Error('UID user tidak ditemukan.');
+
+    if (auth.currentUser?.uid === uid) {
+        throw new Error('Tidak dapat menghapus akun sendiri.');
+    }
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+
+        const response = await fetch(
+            `/api/admin/users/${encodeURIComponent(uid)}`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Gagal menghapus user.');
+        }
+
+        return result;
+
+    } catch (e) {
+        console.error('[FIREBASE] deleteChurchUser:', e);
+        throw e;
     }
 }
 
@@ -665,6 +761,8 @@ window.setUserProfile          = setUserProfile;
 window.loginWithFirebase       = loginWithFirebase;
 window.registerChurch          = registerChurch;
 window.createChurchUser        = createChurchUser;
+window.updateChurchUser        = updateChurchUser;
+window.deleteChurchUser        = deleteChurchUser;
 window.logoutFromFirebase      = logoutFromFirebase;
 window.sendPasswordReset       = sendPasswordReset;
 window.initializeFirestoreData = initializeFirestoreData;

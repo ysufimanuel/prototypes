@@ -603,8 +603,8 @@ function getLang(key) {
 
 const defaultData = {
     users: [
-        { id: 1, nama: 'Administrator', username: 'admin', email: 'admin@gereja.com', password: 'admin123', role: 'superadmin', avatar: null, status: 'aktif', lastLogin: new Date().toISOString() },
-        { id: 2, nama: 'User View', username: 'userview', email: 'user@gereja.com', password: 'user123', role: 'user', avatar: null, status: 'aktif', lastLogin: null }
+        { id: 1, nama: 'Administrator', username: 'admin', email: 'admin@gereja.com', role: 'superadmin', avatar: null, status: 'aktif', lastLogin: new Date().toISOString() },
+        { id: 2, nama: 'User View', username: 'userview', email: 'user@gereja.com', role: 'user', avatar: null, status: 'aktif', lastLogin: null }
     ],
     churchProfile: {
         nama: 'Gereja Kristen Indonesia',
@@ -912,7 +912,7 @@ async function loadAllDataFromFirestore() {
             window.getAllDocuments(window.DB_COLLECTIONS.DONORS),
             window.getAllDocuments(window.DB_COLLECTIONS.VOLUNTEERS),
             window.getAllDocuments(window.DB_COLLECTIONS.ASSIGNMENTS),
-            window.getAllDocuments(window.DB_COLLECTIONS.USERS),
+            window.getAllUsersFromRoot(),
             window.getAllDocuments(window.DB_COLLECTIONS.ANNOUNCEMENTS),
             window.getAllDocuments(window.DB_COLLECTIONS.PEMASUKAN),
             window.getAllDocuments(window.DB_COLLECTIONS.PENGELUARAN),
@@ -1031,7 +1031,6 @@ async function syncDataToFirestore(data) {
         pemasukan:        data.pemasukan        || [],
         pengeluaran:      data.pengeluaran      || [],
         financeCategories: data.financeCategories || [],
-        approvalHistory:   data.approvalHistory   || [],
     };
 
     const batch = window.firebaseWriteBatch(window.db);
@@ -4865,7 +4864,7 @@ function editUser(id) {
 
     editingUserId = id;
     document.getElementById('modal-user-title').textContent = currentLanguage === 'id' ? 'Edit User: ' + user.nama : 'Edit User: ' + user.nama;
-    document.getElementById('user-id').value = user.id;
+    document.getElementById('user-id').value = user.uid;
     document.getElementById('user-nama').value = user.nama;
     document.getElementById('user-username').value = user.username;
     document.getElementById('user-email').value = user.email;
@@ -4885,145 +4884,156 @@ function editUser(id) {
     openModal('modal-user');
 }
 
-function saveUser(e) {
+async function saveUser(e) {
     e.preventDefault();
 
     if (!canManageUsers()) {
         showToast(
-            currentLanguage === 'id'
-                ? 'Anda tidak memiliki akses untuk mengelola user'
-                : 'You do not have permission to manage users',
+            typeof t === 'function'
+                ? t('accessDenied')
+                : 'Akses ditolak',
             'error'
         );
         return;
     }
-    const nama = document.getElementById('user-nama').value.trim();
-    const username = document.getElementById('user-username').value.trim();
-    const email = document.getElementById('user-email').value.trim();
-    const role = document.getElementById('user-role').value;
-    const password = document.getElementById('user-password').value;
 
-    // Validation
-    if (!nama || !username || !email || !role) {
-        showToast(currentLanguage === 'id' ? 'Semua field wajib diisi' : 'All fields are required', 'error');
+    const nama     = document.getElementById('user-nama')?.value?.trim();
+    const username = document.getElementById('user-username')?.value?.trim();
+    const email    = document.getElementById('user-email')?.value?.trim();
+    const role     = document.getElementById('user-role')?.value;
+    const password = document.getElementById('user-password')?.value || '';
+    const uid      = document.getElementById('user-id')?.value?.trim();
+
+    if (!nama || !email || !role) {
+        showToast('Nama, email, dan role wajib diisi.', 'error');
+        return;
+    }
+
+    try {
+        // =========================================
+        // EDIT USER
+        // =========================================
+        if (editingUserId || uid) {
+            const targetUid = editingUserId || uid;
+
+            const existingUser = getData().users.find(u => u.uid === targetUid);
+            if (!existingUser) {
+                showToast('User tidak ditemukan.', 'error');
+                return;
+            }
+
+            const updatedProfile = {
+                nama,
+                username: username || email.split('@')[0],
+                email,
+                role
+            };
+
+            const result = await window.updateChurchUser(targetUid, updatedProfile);
+            if (!result) {
+                throw new Error('Gagal memperbarui user.');
+            }
+
+            const data = getData();
+            const index = data.users.findIndex(u => u.uid === targetUid);
+            if (index !== -1) {
+                data.users[index] = { ...data.users[index], ...updatedProfile };
+            }
+
+            saveData(data);
+            renderUsersGrid();
+            closeModal('modal-user');
+            showToast('User berhasil diperbarui.', 'success');
+            return;
+        }
+
+        // =========================================
+        // CREATE USER
+        // =========================================
+        if (!password || password.length < 6) {
+            showToast('Password minimal 6 karakter.', 'error');
+            return;
+        }
+
+        const newUser = await window.createChurchUser({
+            nama,
+            username: username || email.split('@')[0],
+            email,
+            password,
+            role
+        });
+
+        if (!newUser) {
+            throw new Error('Gagal membuat user.');
+        }
+
+        const data = getData();
+        data.users.push(newUser);
+
+        saveData(data);
+        renderUsersGrid();
+        closeModal('modal-user');
+        showToast('User berhasil dibuat.', 'success');
+
+    } catch (error) {
+        console.error('[APP] saveUser:', error);
+        showToast(error.message || 'Gagal menyimpan user.', 'error');
+    }
+}
+
+async function deleteUser(uid) {
+    if (!canManageUsers()) {
+        showToast(
+            typeof t === 'function'
+                ? t('accessDenied')
+                : 'Akses ditolak',
+            'error'
+        );
+        return;
+    }
+
+    if (!uid) {
+        showToast('UID user tidak ditemukan.', 'error');
+        return;
+    }
+
+    if (uid === currentUser?.uid) {
+        showToast('Superadmin tidak dapat menghapus akun sendiri.', 'error');
         return;
     }
 
     const data = getData();
+    const user = data.users.find(u => u.uid === uid);
 
-    // Check for duplicate username (only for new users)
-    if (!editingUserId) {
-        const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-        if (existingUser) {
-            showToast(currentLanguage === 'id' ? 'Username sudah digunakan' : 'Username already exists', 'error');
-            return;
-        }
-
-        // Check for duplicate email
-        const existingEmail = data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (existingEmail) {
-            showToast(currentLanguage === 'id' ? 'Email sudah digunakan' : 'Email already exists', 'error');
-            return;
-        }
-
-        // Password required for new user
-        if (!password || password.length < 4) {
-            showToast(currentLanguage === 'id' ? 'Password minimal 4 karakter' : 'Password must be at least 4 characters', 'error');
-            return;
-        }
+    if (!user) {
+        showToast('User tidak ditemukan.', 'error');
+        return;
     }
 
-    const userData = {
-        nama: nama,
-        username: username,
-        email: email,
-        role: role,
-        status: 'aktif'
-    };
+    const confirmed = confirm(
+        `Hapus user "${user.nama}"?\n\n` +
+        `Akun Firebase Authentication dan profile user akan dihapus.`
+    );
 
-    if (editingUserId) {
-        // Edit existing user
-        const index = data.users.findIndex(u => u.uid === editingUserId);
-        if (index !== -1) {
-            // Check if username changed and already exists
-            if (username.toLowerCase() !== data.users[index].username.toLowerCase()) {
-                const existingUser = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.uid !== editingUserId);
-                if (existingUser) {
-                    showToast(currentLanguage === 'id' ? 'Username sudah digunakan' : 'Username already exists', 'error');
-                    return;
-                }
-            }
+    if (!confirmed) return;
 
-            // Check if email changed and already exists
-            if (email.toLowerCase() !== data.users[index].email.toLowerCase()) {
-                const existingEmail = data.users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.uid !== editingUserId);
-                if (existingEmail) {
-                    showToast(currentLanguage === 'id' ? 'Email sudah digunakan' : 'Email already exists', 'error');
-                    return;
-                }
-            }
-
-            // Update password only if provided
-            if (password && password.length >= 4) {
-                userData.password = password;
-            } else if (password && password.length < 4) {
-                showToast(currentLanguage === 'id' ? 'Password minimal 4 karakter' : 'Password must be at least 4 characters', 'error');
-                return;
-            } else {
-                userData.password = data.users[index].password;
-            }
-
-            data.users[index] = { ...data.users[index], ...userData };
-            saveData(data);
-            closeModal('modal-user');
-            renderUsersGrid();
-            showToast(currentLanguage === 'id' ? 'User berhasil diupdate' : 'User updated successfully', 'success');
+    try {
+        const result = await window.deleteChurchUser(uid);
+        if (!result) {
+            throw new Error('Gagal menghapus user.');
         }
-    } else {
-        // Add new user
-        userData.password = password;
-        const newId = Math.max(...data.users.map(u => u.id), 0) + 1;
-        const newUser = {
-            id: newId,
-            ...userData,
-            avatar: null,
-            lastLogin: null
-        };
-        data.users.push(newUser);
-        saveData(data);
-        closeModal('modal-user');
+
+        const updatedData = getData();
+        updatedData.users = updatedData.users.filter(u => u.uid !== uid);
+
+        saveData(updatedData);
         renderUsersGrid();
-        showToast(currentLanguage === 'id' ? 'User berhasil ditambahkan' : 'User added successfully', 'success');
+        showToast('User berhasil dihapus.', 'success');
+
+    } catch (error) {
+        console.error('[APP] deleteUser:', error);
+        showToast(error.message || 'Gagal menghapus user.', 'error');
     }
-}
-
-function deleteUser(id) {
-    if (!canManageUsers()) {
-        showToast(
-            currentLanguage === 'id'
-                ? 'Anda tidak memiliki akses untuk menghapus user'
-                : 'You do not have permission to delete users',
-            'error'
-        );
-        return;
-    }
-
-    if (id === currentUser.uid) {
-        showToast(currentLanguage === 'id' ? 'Tidak dapat menghapus akun Anda sendiri' : 'You cannot delete your own account', 'error');
-        return;
-    }
-
-    showConfirm(currentLanguage === 'id' ? 'Apakah Anda yakin ingin menghapus user ini?' : 'Are you sure you want to delete this user?', () => {
-        const data = getData();
-        const index = data.users.findIndex(u => u.uid === id);
-
-        if (index !== -1) {
-            data.users.splice(index, 1);
-            saveData(data);
-            renderUsersGrid();
-            showToast(currentLanguage === 'id' ? 'User berhasil dihapus' : 'User deleted successfully', 'success');
-        }
-    });
 }
 
 // ========================================
@@ -6057,7 +6067,7 @@ function renderApprovalTab() {
         .slice(0, 20);
 
     historyList.innerHTML = historyItems.map(h => {
-        const user = data.users?.find(u => u.id === h.by);
+        const user = data.users?.find(u => u.uid === h.by);
         const item = h.tipe === 'pemasukan'
             ? data.pemasukan?.find(p => p.id === h.itemId)
             : data.pengeluaran?.find(p => p.id === h.itemId);
@@ -6454,14 +6464,14 @@ function approveItem(tipe, id) {
         const index = data.pemasukan.findIndex(p => p.id === id);
         if (index !== -1) {
             data.pemasukan[index].status = 'approved';
-            data.pemasukan[index].approvedBy = currentUser.id;
+            data.pemasukan[index].approvedBy = currentUser.uid;
             data.pemasukan[index].approvedAt = now;
         }
     } else {
         const index = data.pengeluaran.findIndex(p => p.id === id);
         if (index !== -1) {
             data.pengeluaran[index].status = 'approved';
-            data.pengeluaran[index].approvedBy = currentUser.id;
+            data.pengeluaran[index].approvedBy = currentUser.uid;
             data.pengeluaran[index].approvedAt = now;
         }
     }
@@ -6473,7 +6483,7 @@ function approveItem(tipe, id) {
         tipe,
         itemId: id,
         action: 'approved',
-        by: currentUser.id,
+        by: currentUser.uid,
         timestamp: now
     });
 
@@ -6498,14 +6508,14 @@ function rejectItem(tipe, id) {
         const index = data.pemasukan.findIndex(p => p.id === id);
         if (index !== -1) {
             data.pemasukan[index].status = 'rejected';
-            data.pemasukan[index].approvedBy = currentUser.id;
+            data.pemasukan[index].approvedBy = currentUser.uid;
             data.pemasukan[index].approvedAt = now;
         }
     } else {
         const index = data.pengeluaran.findIndex(p => p.id === id);
         if (index !== -1) {
             data.pengeluaran[index].status = 'rejected';
-            data.pengeluaran[index].approvedBy = currentUser.id;
+            data.pengeluaran[index].approvedBy = currentUser.uid;
             data.pengeluaran[index].approvedAt = now;
         }
     }
@@ -6517,7 +6527,7 @@ function rejectItem(tipe, id) {
         tipe,
         itemId: id,
         action: 'rejected',
-        by: currentUser.id,
+        by: currentUser.uid,
         timestamp: now
     });
 
