@@ -730,10 +730,32 @@ setActiveChurch = function(churchId) {
 // ROOT REPOSITORY (Users di root)
 // ========================================
 async function getAllUsersFromRoot() {
-    if (!isFirebaseReady()) return [];
+    if (!isFirebaseReady() || !_activeChurchId) {
+        return [];
+    }
+
     try {
-        const snap = await window.firebaseGetDocs(window.firebaseCollection(window.db, 'users'));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const usersRef = window.firebaseCollection(
+            window.db,
+            'users'
+        );
+
+        const q = window.firebaseQuery(
+            usersRef,
+            window.firebaseWhere(
+                'churchId',
+                '==',
+                _activeChurchId
+            )
+        );
+
+        const snap = await window.firebaseGetDocs(q);
+
+        return snap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+        }));
+
     } catch (e) {
         console.error('[FIREBASE] getAllUsersFromRoot:', e);
         return [];

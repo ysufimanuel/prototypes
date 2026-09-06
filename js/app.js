@@ -1200,7 +1200,7 @@ function canEdit() {
 }
 
 function canDelete() {
-    return currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+    return currentUser && currentUser.role === 'superadmin';
 }
 
 function canAdd() {
@@ -2130,7 +2130,7 @@ function saveDonation(e) {
 }
 
 function deleteDonation(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -2415,7 +2415,7 @@ function saveEvent(e) {
 }
 
 function deleteEvent(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -2813,7 +2813,7 @@ function saveVolunteer(e) {
 }
 
 function deleteVolunteer(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -3183,7 +3183,7 @@ function viewMemberDetail(id) {
 }
 
 async function deleteMember(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -3355,7 +3355,7 @@ function saveFamily(e) {
 }
 
 function deleteFamily(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -3561,7 +3561,7 @@ function saveGroup(e) {
 }
 
 function deleteGroup(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -3897,7 +3897,7 @@ function saveAssignment(e) {
 }
 
 function deleteAssignment(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -4150,7 +4150,7 @@ function saveAnnouncement(e) {
 }
 
 function deleteAnnouncement(id) {
-    if (isViewOnly()) {
+    if (!canDelete()) {
         showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
@@ -6400,9 +6400,9 @@ function saveKategori() {
 
 // Delete Functions
 function deletePemasukan(id) {
-    // Check permission - only admin and superadmin can delete
-    if (isViewOnly()) {
-        showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
+    // Check permission - only superadmin can delete
+    if (!canDelete()) {
+        showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
 
@@ -6417,9 +6417,9 @@ function deletePemasukan(id) {
 }
 
 function deletePengeluaran(id) {
-    // Check permission - only admin and superadmin can delete
-    if (isViewOnly()) {
-        showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
+    // Check permission - only superadmin can delete
+    if (!canDelete()) {
+        showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
 
@@ -6434,9 +6434,9 @@ function deletePengeluaran(id) {
 }
 
 function deleteKategori(id) {
-    // Check permission - only admin and superadmin can delete
-    if (isViewOnly()) {
-        showToast('Anda hanya dapat melihat data. Hubungi admin untuk mengubah data.', 'error');
+    // Check permission - only superadmin can delete
+    if (!canDelete()) {
+        showToast(currentLanguage === 'id' ? 'Anda tidak memiliki izin untuk menghapus data' : 'You do not have permission to delete data', 'error');
         return;
     }
 
@@ -6451,91 +6451,211 @@ function deleteKategori(id) {
 }
 
 // Approval Functions
-function approveItem(tipe, id) {
+async function saveApprovalHistory(historyItem) {
     if (!isSuperAdmin()) {
-        showToast('Hanya Super Admin yang dapat melakukan approval', 'error');
+        console.error('[APP] Unauthorized approval history write');
+        return false;
+    }
+
+    if (!window.isFirebaseReady || !window.isFirebaseReady()) {
+        console.error('[APP] Firebase belum siap');
+        return false;
+    }
+
+    try {
+        const churchId = window.getActiveChurchId();
+
+        if (!churchId) {
+            throw new Error('Active churchId tidak ditemukan.');
+        }
+
+        const docId = String(historyItem.id);
+
+        await window.setDocument(
+            window.DB_COLLECTIONS.APPROVAL_HISTORY,
+            docId,
+            historyItem
+        );
+
+        return true;
+
+    } catch (error) {
+        console.error('[APP] Gagal menyimpan approval history:', error);
+        return false;
+    }
+}
+
+async function approveItem(tipe, id) {
+    if (!canApprove()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Hanya Super Admin yang dapat melakukan approval'
+                : 'Only Super Admin can approve items',
+            'error'
+        );
+        return;
+    }
+
+    if (!currentUser?.uid) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'UID Super Admin tidak ditemukan'
+                : 'Super Admin UID not found',
+            'error'
+        );
         return;
     }
 
     const data = getData();
     const now = new Date().toISOString();
 
+    let item = null;
+
     if (tipe === 'pemasukan') {
         const index = data.pemasukan.findIndex(p => p.id === id);
+
         if (index !== -1) {
             data.pemasukan[index].status = 'approved';
             data.pemasukan[index].approvedBy = currentUser.uid;
             data.pemasukan[index].approvedAt = now;
+            item = data.pemasukan[index];
         }
-    } else {
+    } else if (tipe === 'pengeluaran') {
         const index = data.pengeluaran.findIndex(p => p.id === id);
+
         if (index !== -1) {
             data.pengeluaran[index].status = 'approved';
             data.pengeluaran[index].approvedBy = currentUser.uid;
             data.pengeluaran[index].approvedAt = now;
+            item = data.pengeluaran[index];
         }
     }
 
-    // Add to history
-    if (!data.approvalHistory) data.approvalHistory = [];
-    data.approvalHistory.push({
-        id: data.approvalHistory.length + 1,
+    if (!item) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Data tidak ditemukan'
+                : 'Data not found',
+            'error'
+        );
+        return;
+    }
+
+    const historyItem = {
+        id: Date.now(),
         tipe,
         itemId: id,
         action: 'approved',
         by: currentUser.uid,
         timestamp: now
-    });
+    };
+
+    if (!data.approvalHistory) {
+        data.approvalHistory = [];
+    }
+
+    data.approvalHistory.push(historyItem);
 
     saveData(data);
+    await saveApprovalHistory(historyItem);
+
     renderApprovalTab();
     renderPemasukan();
     renderPengeluaran();
     updateFinanceSummary();
-    showToast('Item berhasil disetujui', 'success');
+
+    showToast(
+        currentLanguage === 'id'
+            ? 'Item berhasil disetujui'
+            : 'Item approved successfully',
+        'success'
+    );
 }
 
-function rejectItem(tipe, id) {
-    if (!isSuperAdmin()) {
-        showToast('Hanya Super Admin yang dapat melakukan approval', 'error');
+async function rejectItem(tipe, id) {
+    if (!canApprove()) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Hanya Super Admin yang dapat melakukan approval'
+                : 'Only Super Admin can reject items',
+            'error'
+        );
+        return;
+    }
+
+    if (!currentUser?.uid) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'UID Super Admin tidak ditemukan'
+                : 'Super Admin UID not found',
+            'error'
+        );
         return;
     }
 
     const data = getData();
     const now = new Date().toISOString();
 
+    let item = null;
+
     if (tipe === 'pemasukan') {
         const index = data.pemasukan.findIndex(p => p.id === id);
+
         if (index !== -1) {
             data.pemasukan[index].status = 'rejected';
             data.pemasukan[index].approvedBy = currentUser.uid;
             data.pemasukan[index].approvedAt = now;
+            item = data.pemasukan[index];
         }
-    } else {
+    } else if (tipe === 'pengeluaran') {
         const index = data.pengeluaran.findIndex(p => p.id === id);
+
         if (index !== -1) {
             data.pengeluaran[index].status = 'rejected';
             data.pengeluaran[index].approvedBy = currentUser.uid;
             data.pengeluaran[index].approvedAt = now;
+            item = data.pengeluaran[index];
         }
     }
 
-    // Add to history
-    if (!data.approvalHistory) data.approvalHistory = [];
-    data.approvalHistory.push({
-        id: data.approvalHistory.length + 1,
+    if (!item) {
+        showToast(
+            currentLanguage === 'id'
+                ? 'Data tidak ditemukan'
+                : 'Data not found',
+            'error'
+        );
+        return;
+    }
+
+    const historyItem = {
+        id: Date.now(),
         tipe,
         itemId: id,
         action: 'rejected',
         by: currentUser.uid,
         timestamp: now
-    });
+    };
+
+    if (!data.approvalHistory) {
+        data.approvalHistory = [];
+    }
+
+    data.approvalHistory.push(historyItem);
 
     saveData(data);
+    await saveApprovalHistory(historyItem);
+
     renderApprovalTab();
     renderPemasukan();
     renderPengeluaran();
-    showToast('Item berhasil ditolak', 'success');
+
+    showToast(
+        currentLanguage === 'id'
+            ? 'Item berhasil ditolak'
+            : 'Item rejected successfully',
+        'success'
+    );
 }
 
 // Laporan Functions
