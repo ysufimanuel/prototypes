@@ -404,7 +404,7 @@ async function registerChurch(churchData, adminData) {
         });
         if (!churchId) throw new Error('Gagal membuat data gereja');
 
-        // 3. Simpan profil Superadmin ke users/{uid}
+        // 3. Simpan profil user
         const profile = {
             uid,
             email: adminData.email,
@@ -416,12 +416,7 @@ async function registerChurch(churchData, adminData) {
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString()
         };
-
-        const profileSaved = await setUserProfile(uid, profile);
-
-        if (!profileSaved) {
-            throw new Error('Gagal membuat profil Superadmin');
-        }
+        await setUserProfile(uid, profile);
 
         // 4. Set gereja aktif
         setActiveChurch(churchId);
