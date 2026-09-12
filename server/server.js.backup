@@ -1,0 +1,99 @@
+require('dotenv').config();
+
+const express = require('express');
+const cors = require('cors');
+const dns = require('dns');
+const https = require('https');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+app.use(express.json());
+
+const adminUsersRouter = require('./admin-users');
+
+app.use('/api/admin', adminUsersRouter);
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CMS V6 Backend hidup 🔥'
+  });
+});
+
+const { auth } = require('./firebase-admin');
+
+app.get('/api/debug-auth', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Bearer token tidak ditemukan'
+      });
+    }
+
+    const idToken = authHeader.substring(7);
+
+console.log('DEBUG TOKEN:', {
+  type: typeof idToken,
+  length: idToken.length,
+  parts: idToken.split('.').length,
+  firstChars: idToken.substring(0, 20)
+});
+
+console.log('[DEBUG] DNS testing...');
+
+dns.lookup('www.googleapis.com', (err, address, family) => {
+  console.log('[DEBUG] DNS:', {
+    err: err ? err.message : null,
+    address,
+    family
+  });
+});
+
+https.get(
+  'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com',
+  response => {
+    console.log('[DEBUG] HTTPS Google:', response.statusCode);
+    response.resume();
+  }
+).on('error', error => {
+  console.error('[DEBUG] HTTPS Google ERROR:', error.message);
+});
+
+console.log('[DEBUG] VERIFY START');
+
+const decoded = await auth.verifyIdToken(idToken);
+
+console.log('[DEBUG] VERIFY SUCCESS');
+    return res.json({
+      success: true,
+      message: 'Firebase ID Token berhasil diverifikasi 🔥',
+      uid: decoded.uid,
+      email: decoded.email || null
+    });
+
+  } catch (error) {
+    console.error('DEBUG AUTH ERROR:', error);
+
+    return res.status(401).json({
+      success: false,
+      message: error.message,
+      code: error.code
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(
+    `CMS V6 Backend running on http://localhost:${PORT}`
+  );
+});
