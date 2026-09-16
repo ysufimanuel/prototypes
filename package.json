@@ -1,0 +1,16 @@
+{
+  "name": "cms-v6-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "firebase-admin": "^14.3.0"
+  }
+}
