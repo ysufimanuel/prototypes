@@ -569,24 +569,38 @@ function setLanguage(lang) {
 
 function applyLanguage() {
     const texts = translations[currentLanguage];
+
     document.querySelectorAll('[data-lang]').forEach(el => {
         const key = el.getAttribute('data-lang');
-        if (texts[key]) {
-            // Preserve any child elements (like icons)
-            const icon = el.querySelector('i');
-            if (icon) {
-                el.innerHTML = '';
-                el.appendChild(icon);
-                el.appendChild(document.createTextNode(' ' + texts[key]));
-            } else {
-                el.textContent = texts[key];
-            }
+
+        if (!texts[key]) return;
+
+        // =========================================
+        // JANGAN ubah textContent SELECT
+        // karena akan menghapus semua OPTION
+        // =========================================
+        if (el.tagName === 'SELECT') {
+            return;
+        }
+
+        // Preserve icon
+        const icon = el.querySelector('i');
+
+        if (icon) {
+            el.innerHTML = '';
+            el.appendChild(icon);
+            el.appendChild(
+                document.createTextNode(' ' + texts[key])
+            );
+        } else {
+            el.textContent = texts[key];
         }
     });
 
     // Update placeholders
     document.querySelectorAll('[data-lang-placeholder]').forEach(el => {
         const key = el.getAttribute('data-lang-placeholder');
+
         if (texts[key]) {
             el.placeholder = texts[key];
         }
@@ -1342,7 +1356,7 @@ async function _showMainApp(user) {
     document.getElementById('login-page').classList.add('hidden');
     document.getElementById('main-app').classList.remove('hidden');
     document.getElementById('user-name').textContent = user.nama;
-    document.getElementById('user-role').textContent = getRoleLabel(user.role);
+    document.getElementById('user-role-display').textContent = getRoleLabel(user.role);
     document.getElementById('welcome-name').textContent = user.nama;
     applyViewOnlyRestrictions();
     initDashboard();
@@ -4826,7 +4840,7 @@ function showAddUserModal() {
     document.getElementById('user-username').value = '';
     document.getElementById('user-email').value = '';
     document.getElementById('user-password').value = '';
-    document.getElementById('user-role').value = 'admin';
+    document.getElementById('user-role').value = 'user';
 
     // Show password required indicator
     const passwordRequired = document.getElementById('password-required');
@@ -4900,7 +4914,12 @@ async function saveUser(e) {
     const nama     = document.getElementById('user-nama')?.value?.trim();
     const username = document.getElementById('user-username')?.value?.trim();
     const email    = document.getElementById('user-email')?.value?.trim();
-    const role     = document.getElementById('user-role')?.value;
+    const roleElement = document.getElementById('user-role');
+    const role = roleElement?.value;
+
+console.log('[APP] ROLE ELEMENT:', roleElement);
+console.log('[APP] ROLE SELECTED:', role);
+
     const password = document.getElementById('user-password')?.value || '';
     const uid      = document.getElementById('user-id')?.value?.trim();
 
@@ -4928,7 +4947,7 @@ async function saveUser(e) {
                 email,
                 role
             };
-
+console.log('[APP] UPDATED PROFILE:', updatedProfile);
             const result = await window.updateChurchUser(targetUid, updatedProfile);
             if (!result) {
                 throw new Error('Gagal memperbarui user.');

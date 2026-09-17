@@ -471,6 +471,11 @@ async function createChurchUser(userData) {
 }
 
 async function updateChurchUser(uid, userData) {
+    console.log('[FIREBASE] UPDATE USER PAYLOAD:', {
+        uid,
+        ...userData
+    });
+    
     if (!isAuthReady() || !_activeChurchId) {
         console.error('[FIREBASE] Auth belum siap atau churchId kosong');
         return null;
@@ -482,7 +487,7 @@ async function updateChurchUser(uid, userData) {
         const token = await auth.currentUser.getIdToken();
 
         const response = await fetch(
-            `/api/admin/users/${encodeURIComponent(uid)}`,
+            `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
             {
                 method: 'PATCH',
                 headers: {
@@ -498,14 +503,15 @@ async function updateChurchUser(uid, userData) {
                 })
             }
         );
+const result = await response.json();
 
-        const result = await response.json();
+if (!response.ok) {
+    throw new Error(
+        result.message || `Gagal memperbarui user. (${response.status})`
+    );
+}
 
-        if (!response.ok) {
-            throw new Error(result.error || 'Gagal memperbarui user.');
-        }
-
-        return result.user;
+return result.user || result;
 
     } catch (e) {
         console.error('[FIREBASE] updateChurchUser:', e);
@@ -529,7 +535,7 @@ async function deleteChurchUser(uid) {
         const token = await auth.currentUser.getIdToken();
 
         const response = await fetch(
-            `/api/admin/users/${encodeURIComponent(uid)}`,
+            `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
             {
                 method: 'DELETE',
                 headers: {
