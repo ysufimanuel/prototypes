@@ -162,6 +162,23 @@ router.patch('/users/:uid', requireSuperAdmin, async (req, res) => {
         }
 
         const existingUser = userSnap.data();
+        // =========================================
+        // CEGAH SUPERADMIN MENGUBAH ROLE DIRI SENDIRI
+        // =========================================
+
+        const isSelf = req.user?.uid === uid;
+        const isChangingRole = role !== existingUser.role;
+
+        if (
+            isSelf &&
+            isChangingRole
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Super Admin tidak dapat mengubah role dirinya sendiri.'
+            });
+        }
+
 
         // Pastikan superadmin hanya mengubah user di church yang sama
         if (

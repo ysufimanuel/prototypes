@@ -6,10 +6,9 @@ const dns = require('dns');
 const https = require('https');
 const jwt = require('jsonwebtoken');
 
-const serviceAccountPath = path.join(
-  __dirname,
-  '..',
-  'churchmanagementsystem-a77a3-firebase-adminsdk-fbsvc-2ce944832f.json'
+const serviceAccountPath = path.resolve(
+  process.cwd(),
+  process.env.GOOGLE_APPLICATION_CREDENTIALS
 );
 
 if (!fs.existsSync(serviceAccountPath)) {
