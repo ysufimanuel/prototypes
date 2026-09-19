@@ -787,7 +787,6 @@ const DB_COLLECTIONS = {
   ASSIGNMENTS: "assignments",
   USERS: "users",
   ANNOUNCEMENTS: "announcements",
-  MESSAGES: "messages",
   PEMASUKAN: "pemasukan",
   PENGELUARAN: "pengeluaran",
   FINANCE_CATEGORIES: "financeCategories",
@@ -805,6 +804,87 @@ const DB_COLLECTIONS = {
 window.DB_COLLECTIONS = DB_COLLECTIONS;
 window.isFirebaseReady = isFirebaseReady;
 window.isAuthReady = isAuthReady;
+window.listenToChatMessages = listenToChatMessages;
+
+async function listenToChatMessages(otherUid, callback) {
+  if (!isFirebaseReady() || !_activeChurchId) {
+    return () => {};
+  }
+
+  if (!window.auth?.currentUser) {
+    console.error("[FIREBASE] listenToChatMessages: user belum login");
+    return () => {};
+  }
+
+  const currentUid = window.auth.currentUser.uid;
+
+  const messagesRef = window.firebaseCollection(window.db, "messages");
+
+  const sentQuery = window.firebaseQuery(
+    messagesRef,
+    window.firebaseWhere("churchId", "==", _activeChurchId),
+    window.firebaseWhere("senderId", "==", currentUid),
+    window.firebaseWhere("receiverId", "==", otherUid),
+  );
+
+  const receivedQuery = window.firebaseQuery(
+    messagesRef,
+    window.firebaseWhere("churchId", "==", _activeChurchId),
+    window.firebaseWhere("senderId", "==", otherUid),
+    window.firebaseWhere("receiverId", "==", currentUid),
+  );
+
+  let sentMessages = [];
+  let receivedMessages = [];
+
+  const emit = () => {
+    const messages = [...sentMessages, ...receivedMessages];
+
+    const unique = new Map();
+
+    messages.forEach((message) => {
+      unique.set(message.id, message);
+    });
+
+    const result = [...unique.values()].sort((a, b) => {
+      const timeA = new Date(a.timestamp || a.createdAt).getTime();
+
+      const timeB = new Date(b.timestamp || b.createdAt).getTime();
+
+      return timeA - timeB;
+    });
+
+    callback(result);
+  };
+
+  const unsubSent = window.firebaseOnSnapshot(sentQuery, (snap) => {
+    sentMessages = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    emit();
+  });
+
+  const unsubReceived = window.firebaseOnSnapshot(receivedQuery, (snap) => {
+    receivedMessages = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    emit();
+  });
+
+  return () => {
+    try {
+      unsubSent?.();
+    } catch (_) {}
+
+    try {
+      unsubReceived?.();
+    } catch (_) {}
+  };
+}
 
 // ========================================
 // TENANT CONTEXT GUARD (FIX RACE CONDITION)

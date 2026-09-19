@@ -85,7 +85,8 @@
   let _unsubscribers = []; // onSnapshot unsubscribe fns
   let _birthdayChecked = false; // cegah cek berulang hari ini
   let _birthdayCheckDate = null; // tanggal terakhir dicek
-
+  let _chatNotificationUnsubscribe = null;
+  let _chatNotificationInitialized = false;
   // =========================================================
   // UTIL — tunggu sampai kondisi terpenuhi
   // =========================================================
@@ -140,6 +141,7 @@
       }
     });
 
+    _listenIncomingMessages();
     // Juga dengarkan financeConfig (single doc) secara terpisah
     _listenFinanceConfig();
 
@@ -154,6 +156,14 @@
       } catch (_) {}
     });
     _unsubscribers = [];
+
+    if (_chatNotificationUnsubscribe) {
+      try {
+        _chatNotificationUnsubscribe();
+      } catch (_) {}
+
+      _chatNotificationUnsubscribe = null;
+    }
     console.log("[RTFB] Semua listener dihentikan");
   }
 
@@ -250,6 +260,113 @@
     }
   }
 
+  function _listenIncomingMessages() {
+    if (
+      !window.firebaseOnSnapshot ||
+      !window.firebaseCollection ||
+      !window.firebaseQuery ||
+      !window.firebaseWhere ||
+      !window.db ||
+      !window.auth?.currentUser ||
+      !window.getActiveChurchId
+    ) {
+      return;
+    }
+
+    const currentUid = window.auth.currentUser.uid;
+
+    const churchId = window.getActiveChurchId();
+
+    const messagesRef = window.firebaseCollection(window.db, "messages");
+
+    const q = window.firebaseQuery(
+      messagesRef,
+      window.firebaseWhere("churchId", "==", churchId),
+      window.firebaseWhere("receiverId", "==", currentUid),
+    );
+
+    _chatNotificationInitialized = false;
+
+    _chatNotificationUnsubscribe = window.firebaseOnSnapshot(
+      q,
+      (snap) => {
+        // Snapshot pertama hanya sinkronisasi,
+        // jangan bikin notification untuk pesan lama.
+        if (!_chatNotificationInitialized) {
+          _chatNotificationInitialized = true;
+          return;
+        }
+
+        snap.docChanges().forEach((change) => {
+          if (change.type !== "added") return;
+
+          const message = {
+            id: change.doc.id,
+            ...change.doc.data(),
+          };
+
+          _handleIncomingChatMessage(message);
+        });
+      },
+      (error) => {
+        console.error("[RTFB] Incoming message listener:", error);
+      },
+    );
+  }
+
+  async function _handleIncomingChatMessage(message) {
+    if (!message) return;
+
+    const senderId = message.senderId;
+
+    if (!senderId) return;
+
+    let senderName = "User";
+
+    try {
+      if (window.getUserProfile) {
+        const sender = await window.getUserProfile(senderId);
+
+        if (sender) {
+          senderName =
+            sender.nama || sender.username || sender.email || senderName;
+        }
+      }
+    } catch (e) {
+      console.warn("[RTFB] Gagal mengambil sender:", e);
+    }
+
+    // ==========================================
+    // TOAST REALTIME
+    // ==========================================
+
+    _showToastSafe(`💬 Pesan baru dari ${senderName}`, "info");
+
+    // ==========================================
+    // NOTIFICATION PERSISTENT
+    // ==========================================
+
+    if (window.addNotification) {
+      try {
+        await window.addNotification({
+          title: "💬 Pesan Baru",
+          message: `${senderName}: ${message.content || ""}`,
+          type: "message",
+          senderId: senderId,
+          messageId: message.id,
+          timestamp: new Date().toISOString(),
+          read: false,
+        });
+
+        console.log("[RTFB] Notification pesan dibuat:", message.id);
+      } catch (e) {
+        console.error("[RTFB] Gagal membuat notification pesan:", e);
+      }
+    } else {
+      console.warn("[RTFB] window.addNotification tidak tersedia");
+    }
+  }
+  const activeChatId = window.getCurrentChatId?.();
   // =========================================================
   // BIRTHDAY NOTIFICATION
   // =========================================================

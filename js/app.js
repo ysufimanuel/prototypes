@@ -611,585 +611,6 @@ function getLang(key) {
   return translations[currentLanguage][key] || key;
 }
 
-// ========================================
-// DATA STORAGE & INITIALIZATION
-// ========================================
-
-const defaultData = {
-  users: [
-    {
-      id: 1,
-      nama: "Administrator",
-      username: "admin",
-      email: "admin@gereja.com",
-      role: "superadmin",
-      avatar: null,
-      status: "aktif",
-      lastLogin: new Date().toISOString(),
-    },
-    {
-      id: 2,
-      nama: "User View",
-      username: "userview",
-      email: "user@gereja.com",
-      role: "user",
-      avatar: null,
-      status: "aktif",
-      lastLogin: null,
-    },
-  ],
-  churchProfile: {
-    nama: "Gereja Kristen Indonesia",
-    alamat: "Jl. Gereja No. 123",
-    kota: "Jakarta",
-    telepon: "021-12345678",
-    email: "info@gereja.com",
-    website: "www.gereja.com",
-  },
-  members: [
-    {
-      id: 1,
-      nama: "Budi Santoso",
-      email: "budi@email.com",
-      telepon: "081234567890",
-      jk: "Laki-laki",
-      tempatLahir: "Jakarta",
-      tglLahir: "1985-03-15",
-      alamat: "Jl. Mawar No. 1",
-      kota: "Jakarta",
-      kodepos: "12345",
-      status: "aktif",
-      groupId: 1,
-      joinDate: "2020-01-15",
-      avatar: null,
-    },
-    {
-      id: 2,
-      nama: "Siti Aminah",
-      email: "siti@email.com",
-      telepon: "081234567891",
-      jk: "Perempuan",
-      tempatLahir: "Bandung",
-      tglLahir: "1988-07-20",
-      alamat: "Jl. Melati No. 5",
-      kota: "Jakarta",
-      kodepos: "12345",
-      status: "aktif",
-      groupId: 2,
-      joinDate: "2019-06-10",
-      avatar: null,
-    },
-    {
-      id: 3,
-      nama: "Ahmad Hidayat",
-      email: "ahmad@email.com",
-      telepon: "081234567892",
-      jk: "Laki-laki",
-      tempatLahir: "Surabaya",
-      tglLahir: "1982-11-05",
-      alamat: "Jl. Anggrek No. 10",
-      kota: "Jakarta",
-      kodepos: "12345",
-      status: "aktif",
-      groupId: 1,
-      joinDate: "2021-03-22",
-      avatar: null,
-    },
-    {
-      id: 4,
-      nama: "Dewi Kusuma",
-      email: "dewi@email.com",
-      telepon: "081234567893",
-      jk: "Perempuan",
-      tempatLahir: "Yogyakarta",
-      tglLahir: "1990-01-30",
-      alamat: "Jl. Kenanga No. 8",
-      kota: "Jakarta",
-      kodepos: "12345",
-      status: "aktif",
-      groupId: null,
-      joinDate: "2022-08-15",
-      avatar: null,
-    },
-    {
-      id: 5,
-      nama: "Eko Prasetyo",
-      email: "eko@email.com",
-      telepon: "081234567894",
-      jk: "Laki-laki",
-      tempatLahir: "Semarang",
-      tglLahir: "1978-09-12",
-      alamat: "Jl. Cempaka No. 15",
-      kota: "Jakarta",
-      kodepos: "12345",
-      status: "aktif",
-      groupId: 3,
-      joinDate: "2018-12-01",
-      avatar: null,
-    },
-  ],
-  families: [
-    {
-      id: 1,
-      nama: "Keluarga Budi Santoso",
-      kepalaId: 1,
-      anggota: [1, 2],
-      alamat: "Jl. Mawar No. 1",
-      kota: "Jakarta",
-    },
-    {
-      id: 2,
-      nama: "Keluarga Ahmad Hidayat",
-      kepalaId: 3,
-      anggota: [3, 4],
-      alamat: "Jl. Anggrek No. 10",
-      kota: "Jakarta",
-    },
-  ],
-  groups: [
-    {
-      id: 1,
-      nama: "Youth Ministry",
-      deskripsi: "Pelayanan pemuda gereja",
-      leaderId: 1,
-      jadwal: "Setiap Jumat, 19:00 WIB",
-      anggota: [1, 3],
-      createdAt: "2020-01-01",
-      showPhone: true,
-    },
-    {
-      id: 2,
-      nama: "Worship Team",
-      deskripsi: "Tim pujian dan penyembahan",
-      leaderId: 2,
-      jadwal: "Setiap Sabtu, 16:00 WIB",
-      anggota: [2],
-      createdAt: "2019-06-01",
-      showPhone: true,
-    },
-    {
-      id: 3,
-      nama: "Prayer Team",
-      deskripsi: "Tim doa gereja",
-      leaderId: 5,
-      jadwal: "Setiap Selasa, 18:00 WIB",
-      anggota: [5],
-      createdAt: "2018-12-01",
-      showPhone: false,
-    },
-  ],
-  events: [
-    {
-      id: 1,
-      nama: "Ibadah Minggu Pagi",
-      tipe: "ibadah",
-      customType: null,
-      start: "2024-01-21T07:00",
-      end: "2024-01-21T09:00",
-      lokasi: "Gedung Utama Gereja",
-      deskripsi: "Ibadah rutin minggu pagi",
-      kapasitas: 200,
-      status: "upcoming",
-      participants: [],
-    },
-    {
-      id: 2,
-      nama: "Youth Fellowship",
-      tipe: "sosial",
-      customType: null,
-      start: "2024-01-26T19:00",
-      end: "2024-01-26T21:00",
-      lokasi: "Ruang Youth",
-      deskripsi: "Persekutuan pemuda",
-      kapasitas: 50,
-      status: "upcoming",
-      participants: [],
-    },
-    {
-      id: 3,
-      nama: "Seminar Pernikahan",
-      tipe: "seminar",
-      customType: null,
-      start: "2024-02-10T09:00",
-      end: "2024-02-10T16:00",
-      lokasi: "Aula Gereja",
-      deskripsi: "Seminar untuk pasangan yang akan menikah",
-      kapasitas: 30,
-      status: "upcoming",
-      participants: [],
-    },
-  ],
-  attendance: [
-    {
-      id: 1,
-      eventId: 1,
-      memberId: 1,
-      tanggal: "2024-01-14",
-      waktu: "07:15",
-      status: "hadir",
-    },
-    {
-      id: 2,
-      eventId: 1,
-      memberId: 2,
-      tanggal: "2024-01-14",
-      waktu: "07:20",
-      status: "hadir",
-    },
-    {
-      id: 3,
-      eventId: 1,
-      memberId: 3,
-      tanggal: "2024-01-14",
-      waktu: "07:30",
-      status: "hadir",
-    },
-  ],
-  donations: [
-    {
-      id: 1,
-      donorId: 1,
-      tipe: "perpuluhan",
-      jumlah: 500000,
-      tanggal: "2024-01-15",
-      keterangan: "Perpuluhan Januari",
-    },
-    {
-      id: 2,
-      donorId: 2,
-      tipe: "persembahan",
-      jumlah: 250000,
-      tanggal: "2024-01-15",
-      keterangan: "Persembahan Minggu",
-    },
-    {
-      id: 3,
-      donorId: 3,
-      tipe: "pembangunan",
-      jumlah: 1000000,
-      tanggal: "2024-01-10",
-      keterangan: "Donasi pembangunan",
-    },
-  ],
-  volunteers: [
-    {
-      id: 1,
-      memberId: 1,
-      externalNama: null,
-      externalEmail: null,
-      externalTelepon: null,
-      area: "usher",
-      jadwal: ["minggu-pagi", "minggu-sore"],
-      status: "aktif",
-    },
-    {
-      id: 2,
-      memberId: 2,
-      externalNama: null,
-      externalEmail: null,
-      externalTelepon: null,
-      area: "worship-leader",
-      jadwal: ["minggu-pagi"],
-      status: "aktif",
-    },
-    {
-      id: 3,
-      memberId: null,
-      externalNama: "John Doe",
-      externalEmail: "john@email.com",
-      externalTelepon: "081234567895",
-      area: "singer",
-      jadwal: ["minggu-pagi", "minggu-sore"],
-      status: "aktif",
-    },
-  ],
-  assignments: [
-    {
-      id: 1,
-      volunteerId: 1,
-      eventId: 1,
-      tanggal: "2024-01-21",
-      waktu: "06:30",
-      tempat: "Gedung Utama Gereja",
-      tugas: "Menerima tamu di pintu masuk",
-      catatan: "",
-      status: "assigned",
-    },
-    {
-      id: 2,
-      volunteerId: 2,
-      eventId: 1,
-      tanggal: "2024-01-21",
-      waktu: "06:00",
-      tempat: "Ruang Worship",
-      tugas: "Lead worship",
-      catatan: "",
-      status: "assigned",
-    },
-  ],
-  announcements: [
-    {
-      id: 1,
-      judul: "Jadwal Ibadah Natal",
-      konten:
-        "Ibadah Natal akan dilaksanakan pada tanggal 24 Desember 2024 pukul 18:00 WIB.",
-      tanggal: "2024-12-20",
-      expiry: "2024-12-25",
-      important: true,
-      authorId: 1,
-    },
-    {
-      id: 2,
-      judul: "Perubahan Jadwal Youth",
-      konten: "Youth Fellowship pindah ke hari Sabtu jam 17:00 WIB.",
-      tanggal: "2024-01-15",
-      expiry: "2024-02-15",
-      important: false,
-      authorId: 1,
-    },
-  ],
-  messages: [
-    {
-      id: 1,
-      senderId: 1,
-      receiverId: 2,
-      content: "Halo Siti, apakah besok bisa latihan worship?",
-      timestamp: "2024-01-15T10:00:00",
-      read: true,
-    },
-    {
-      id: 2,
-      senderId: 2,
-      receiverId: 1,
-      content: "Bisa Pak Budi, jam berapa?",
-      timestamp: "2024-01-15T10:05:00",
-      read: false,
-    },
-  ],
-  activities: [
-    {
-      id: 1,
-      type: "member",
-      action: "Member baru ditambahkan",
-      detail: "Eko Prasetyo",
-      timestamp: "2024-01-15T09:00:00",
-    },
-    {
-      id: 2,
-      type: "donation",
-      action: "Donasi diterima",
-      detail: "Rp 500.000 dari Budi Santoso",
-      timestamp: "2024-01-15T08:30:00",
-    },
-    {
-      id: 3,
-      type: "event",
-      action: "Event dibuat",
-      detail: "Seminar Pernikahan",
-      timestamp: "2024-01-14T16:00:00",
-    },
-    {
-      id: 4,
-      type: "attendance",
-      action: "Check-in",
-      detail: "Budi Santoso - Ibadah Minggu",
-      timestamp: "2024-01-14T07:15:00",
-    },
-  ],
-  notifications: [
-    {
-      id: 1,
-      title: "Event Mendatang",
-      message: "Youth Fellowship besok jam 19:00",
-      type: "event",
-      read: false,
-      timestamp: "2024-01-15T10:00:00",
-    },
-    {
-      id: 2,
-      title: "Donasi Baru",
-      message: "Rp 1.000.000 dari Ahmad Hidayat",
-      type: "donation",
-      read: false,
-      timestamp: "2024-01-15T09:00:00",
-    },
-    {
-      id: 3,
-      title: "Member Baru",
-      message: "Dewi Kusuma bergabung",
-      type: "member",
-      read: false,
-      timestamp: "2024-01-14T14:00:00",
-    },
-  ],
-  // Finance Data
-  finance: {
-    saldoAwal: 5000000,
-    saldoAkhir: 0,
-  },
-  financeCategories: [
-    {
-      id: 1,
-      nama: "Persembahan",
-      tipe: "pemasukan",
-      deskripsi: "Persembahan jemaat",
-    },
-    {
-      id: 2,
-      nama: "Perpuluhan",
-      tipe: "pemasukan",
-      deskripsi: "Perpuluhan jemaat",
-    },
-    {
-      id: 3,
-      nama: "Donasi",
-      tipe: "pemasukan",
-      deskripsi: "Donasi dari jemaat",
-    },
-    {
-      id: 4,
-      nama: "Lainnya (Pemasukan)",
-      tipe: "pemasukan",
-      deskripsi: "Pemasukan lainnya",
-    },
-    {
-      id: 5,
-      nama: "Operasional",
-      tipe: "pengeluaran",
-      deskripsi: "Biaya operasional gereja",
-    },
-    {
-      id: 6,
-      nama: "Kegiatan",
-      tipe: "pengeluaran",
-      deskripsi: "Biaya kegiatan gereja",
-    },
-    {
-      id: 7,
-      nama: "Sosial",
-      tipe: "pengeluaran",
-      deskripsi: "Biaya sosial/misi",
-    },
-    {
-      id: 8,
-      nama: "Lainnya (Pengeluaran)",
-      tipe: "pengeluaran",
-      deskripsi: "Pengeluaran lainnya",
-    },
-  ],
-  pemasukan: [
-    {
-      id: 1,
-      kategoriId: 1,
-      jumlah: 2500000,
-      tanggal: "2024-01-15",
-      keterangan: "Persembahan Minggu",
-      donaturId: 1,
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-15T10:00:00",
-    },
-    {
-      id: 2,
-      kategoriId: 2,
-      jumlah: 1500000,
-      tanggal: "2024-01-15",
-      keterangan: "Perpuluhan Januari",
-      donaturId: 2,
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-15T10:05:00",
-    },
-    {
-      id: 3,
-      kategoriId: 3,
-      jumlah: 1000000,
-      tanggal: "2024-01-10",
-      keterangan: "Donasi pembangunan",
-      donaturId: 3,
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-10T09:00:00",
-    },
-  ],
-  pengeluaran: [
-    {
-      id: 1,
-      kategoriId: 5,
-      jumlah: 500000,
-      tanggal: "2024-01-16",
-      keterangan: "Beli ATK",
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-16T14:00:00",
-    },
-    {
-      id: 2,
-      kategoriId: 6,
-      jumlah: 1200000,
-      tanggal: "2024-01-14",
-      keterangan: "Biaya Youth Fellowship",
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-14T16:00:00",
-    },
-    {
-      id: 3,
-      kategoriId: 7,
-      jumlah: 800000,
-      tanggal: "2024-01-12",
-      keterangan: "Bantuan sosial warga",
-      status: "approved",
-      approvedBy: 1,
-      approvedAt: "2024-01-12T10:00:00",
-    },
-  ],
-  approvalHistory: [
-    {
-      id: 1,
-      tipe: "pemasukan",
-      itemId: 1,
-      action: "approved",
-      by: 1,
-      timestamp: "2024-01-15T10:00:00",
-    },
-    {
-      id: 2,
-      tipe: "pengeluaran",
-      itemId: 1,
-      action: "approved",
-      by: 1,
-      timestamp: "2024-01-16T14:00:00",
-    },
-  ],
-  donatur: [
-    {
-      id: 1,
-      nama: "Budi Santoso",
-      email: "budi@email.com",
-      telepon: "081234567890",
-      totalDonasi: 2500000,
-      terakhirDonasi: "2024-01-15",
-    },
-    {
-      id: 2,
-      nama: "Siti Aminah",
-      email: "siti@email.com",
-      telepon: "081234567891",
-      totalDonasi: 1500000,
-      terakhirDonasi: "2024-01-15",
-    },
-    {
-      id: 3,
-      nama: "Ahmad Hidayat",
-      email: "ahmad@email.com",
-      telepon: "081234567892",
-      totalDonasi: 1000000,
-      terakhirDonasi: "2024-01-10",
-    },
-  ],
-};
-
 // Initialize data
 function initData() {
   // Force reset untuk v5 - hapus data lama
@@ -1400,7 +821,6 @@ async function loadAllDataFromFirestore() {
       window.getAllDocuments(window.DB_COLLECTIONS.ASSIGNMENTS),
       window.getAllUsersFromRoot(),
       window.getAllDocuments(window.DB_COLLECTIONS.ANNOUNCEMENTS),
-      window.getAllDocuments(window.DB_COLLECTIONS.MESSAGES),
       window.getAllDocuments(window.DB_COLLECTIONS.PEMASUKAN),
       window.getAllDocuments(window.DB_COLLECTIONS.PENGELUARAN),
       window.getAllDocuments(window.DB_COLLECTIONS.FINANCE_CATEGORIES),
@@ -1711,6 +1131,8 @@ if (typeof window.isAuthReady !== "function") {
 }
 
 let currentChatId = null;
+let currentChatRealtimeUnsubscribe = null;
+window.getCurrentChatId = () => currentChatId;
 let attendanceChart = null;
 let memberChart = null;
 let currentGroupId = null;
@@ -5407,6 +4829,15 @@ function renderContactsList() {
 async function openChat(userId) {
   currentChatId = userId;
 
+  // Stop listener chat sebelumnya
+  if (currentChatRealtimeUnsubscribe) {
+    try {
+      currentChatRealtimeUnsubscribe();
+    } catch (_) {}
+
+    currentChatRealtimeUnsubscribe = null;
+  }
+
   const data = getData();
 
   const user = data.users?.find((u) => u.uid === userId || u.id === userId);
@@ -5439,7 +4870,78 @@ async function openChat(userId) {
     inputArea.style.display = "flex";
   }
 
-  await renderChatMessages();
+  // Kalau realtime chat helper belum tersedia,
+  // fallback ke render biasa.
+  if (typeof window.listenToChatMessages !== "function") {
+    await renderChatMessages();
+    return;
+  }
+
+  currentChatRealtimeUnsubscribe = window.listenToChatMessages(
+    userId,
+    (messages) => {
+      if (currentChatId !== userId) return;
+
+      renderRealtimeChatMessages(messages);
+    },
+  );
+}
+
+function closeChat() {
+  if (currentChatRealtimeUnsubscribe) {
+    currentChatRealtimeUnsubscribe(); // Matikan listener Firebase yang lama
+    currentChatRealtimeUnsubscribe = null;
+  }
+  currentChatId = null; // Reset status ID
+}
+
+function renderRealtimeChatMessages(messages) {
+  const container = document.getElementById("chat-messages");
+
+  if (!container) return;
+
+  if (!messages.length) {
+    container.innerHTML = `
+      <div style="
+        text-align:center;
+        padding:30px;
+        color:#888;
+      ">
+        Belum ada pesan.
+      </div>
+    `;
+
+    return;
+  }
+
+  const currentUid = window.auth?.currentUser?.uid;
+
+  container.innerHTML = messages
+    .map((message) => {
+      const isMine = message.senderId === currentUid;
+
+      const time = message.timestamp
+        ? new Date(message.timestamp).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "";
+
+      return `
+        <div class="message ${isMine ? "sent" : "received"}">
+          <div class="message-content">
+            ${escapeHtml(message.content || "")}
+          </div>
+
+          <div class="message-time">
+            ${time}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  container.scrollTop = container.scrollHeight;
 }
 
 async function renderChatMessages() {
@@ -9105,6 +8607,8 @@ window.saveBroadcastDraft = saveBroadcastDraft;
 window.sendMessage = sendMessage;
 window.searchContacts = searchContacts;
 window.refreshContacts = refreshContacts;
+window.getChatMessages(otherUid);
+window.listenToChatMessages(otherUid, callback);
 
 // ============================================================
 // REPORTS
