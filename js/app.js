@@ -930,21 +930,24 @@ async function saveData(data) {
 async function syncDataToFirestore(data) {
   if (!isFirebaseReady() || !window.getActiveChurchId()) return;
 
+  // Cache lama bisa berisi object/null; batch Firestore hanya menerima daftar item.
+  const asArray = (value) => (Array.isArray(value) ? value : []);
+
   const collections = {
-    members: data.members || [],
-    families: data.families || [],
-    groups: data.groups || [],
-    events: data.events || [],
-    attendance: data.attendance || [],
-    donations: data.donations || [],
-    donors: data.donors || [],
-    volunteers: data.volunteers || [],
-    assignments: data.assignments || [],
-    announcements: data.announcements || [],
-    messages: data.messages || [],
-    pemasukan: data.pemasukan || [],
-    pengeluaran: data.pengeluaran || [],
-    financeCategories: data.financeCategories || [],
+    members: asArray(data.members),
+    families: asArray(data.families),
+    groups: asArray(data.groups),
+    events: asArray(data.events),
+    attendance: asArray(data.attendance),
+    donations: asArray(data.donations),
+    donors: asArray(data.donors),
+    volunteers: asArray(data.volunteers),
+    assignments: asArray(data.assignments),
+    announcements: asArray(data.announcements),
+    // Chat memakai root collection /messages dan tidak ikut batch data gereja.
+    pemasukan: asArray(data.pemasukan),
+    pengeluaran: asArray(data.pengeluaran),
+    financeCategories: asArray(data.financeCategories),
   };
 
   const batch = window.firebaseWriteBatch(window.db);
@@ -8607,8 +8610,11 @@ window.saveBroadcastDraft = saveBroadcastDraft;
 window.sendMessage = sendMessage;
 window.searchContacts = searchContacts;
 window.refreshContacts = refreshContacts;
-window.getChatMessages(otherUid);
-window.listenToChatMessages(otherUid, callback);
+window.openChat = openChat;
+window.markAllNotificationsRead = markAllNotificationsRead;
+window._showMainApp = _showMainApp;
+window.loadNotifications = loadNotifications;
+window.renderNotifications = renderNotifications;
 
 // ============================================================
 // REPORTS
