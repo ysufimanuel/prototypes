@@ -803,7 +803,6 @@ async function loadAllDataFromFirestore() {
       assignments,
       users,
       announcements,
-      messages,
       pemasukan,
       pengeluaran,
       financeCategories,
@@ -842,11 +841,18 @@ async function loadAllDataFromFirestore() {
       assignments: assignments || [],
       users: users || [],
       announcements: announcements || [],
-      messages: messages || [],
+      // Chat memakai root collection /messages dan diambil per percakapan.
+      messages: [],
       pemasukan: pemasukan || [],
       pengeluaran: pengeluaran || [],
       financeCategories: financeCategories || [],
-      finance: financeConfig || { saldoAwal: 0 },
+      // Lindungi aplikasi dari data konfigurasi lama yang salah berbentuk array.
+      finance:
+        financeConfig &&
+        typeof financeConfig === "object" &&
+        !Array.isArray(financeConfig)
+          ? financeConfig
+          : { saldoAwal: 0 },
       approvalHistory: approvalHistory || [],
       activities: [],
     };
@@ -965,7 +971,11 @@ async function syncDataToFirestore(data) {
     }
   }
 
-  if (data.finance) {
+  if (
+    data.finance &&
+    typeof data.finance === "object" &&
+    !Array.isArray(data.finance)
+  ) {
     const configRef = window.firebaseDoc(
       window.db,
       "churches",
@@ -6757,6 +6767,64 @@ function initFinance() {
   });
 }
 
+// Dipanggil oleh listener Firestore agar cache aplikasi dan UI memakai data
+// snapshot terbaru, tanpa memerlukan refresh halaman.
+function applyRealtimeCollectionUpdate(collectionName, docs) {
+  if (!dataCache) dataCache = {};
+  dataCache[collectionName] = Array.isArray(docs) ? docs : [];
+  window.dataCache = dataCache;
+}
+
+function applyRealtimeFinanceConfig(config) {
+  if (!dataCache) dataCache = {};
+  dataCache.finance =
+    config && typeof config === "object" && !Array.isArray(config)
+      ? config
+      : { saldoAwal: 0 };
+  window.dataCache = dataCache;
+}
+
+function refreshRealtimeUI(collectionName) {
+  const renderers = {
+    members: [renderMembersTable, initDashboard],
+    families: [renderFamiliesGrid, initDashboard],
+    groups: [renderGroupsGrid, initDashboard],
+    events: [renderEventsGrid, initDashboard],
+    attendance: [renderAttendanceTable, initDashboard],
+    donations: [renderDonationsTable, initDashboard],
+    donors: [renderDonationsTable, refreshFinanceViews],
+    volunteers: [renderVolunteersGrid],
+    assignments: [renderVolunteersGrid],
+    users: [renderUsersGrid, renderContactsList],
+    announcements: [renderAnnouncementsList],
+    pemasukan: [refreshFinanceViews, initDashboard],
+    pengeluaran: [refreshFinanceViews, initDashboard],
+    financeCategories: [refreshFinanceViews],
+    financeConfig: [refreshFinanceViews],
+    approvalHistory: [renderApprovalTab],
+    deaths: [renderDeathList],
+  };
+
+  (renderers[collectionName] || []).forEach((render) => {
+    try {
+      render();
+    } catch (error) {
+      console.warn(`[REALTIME] Gagal merender ${collectionName}:`, error);
+    }
+  });
+}
+
+function refreshFinanceViews() {
+  updateFinanceSummary();
+  initFinanceCharts();
+  renderPemasukan();
+  renderPengeluaran();
+  renderKategori();
+  renderApprovalTab();
+  populateKategoriSelects();
+  populateDonaturSelect();
+}
+
 // Show Finance Tab
 function showFinanceTab(tabName, clickedBtn) {
   const tabButtons = document.querySelectorAll(".finance-tab");
@@ -8615,6 +8683,9 @@ window.markAllNotificationsRead = markAllNotificationsRead;
 window._showMainApp = _showMainApp;
 window.loadNotifications = loadNotifications;
 window.renderNotifications = renderNotifications;
+window.applyRealtimeCollectionUpdate = applyRealtimeCollectionUpdate;
+window.applyRealtimeFinanceConfig = applyRealtimeFinanceConfig;
+window.refreshRealtimeUI = refreshRealtimeUI;
 
 // ============================================================
 // REPORTS

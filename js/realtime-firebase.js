@@ -38,6 +38,7 @@
     "financeCategories",
     "notifications",
     "approvalHistory",
+    "deaths",
   ];
 
   /** Map koleksi → field di dataCache */
@@ -51,12 +52,14 @@
     donors: "donors",
     volunteers: "volunteers",
     assignments: "assignments",
+    users: "users",
     announcements: "announcements",
     pemasukan: "pemasukan",
     pengeluaran: "pengeluaran",
     financeCategories: "financeCategories",
     notifications: "notifications",
     approvalHistory: "approvalHistory",
+    deaths: "deaths",
   };
 
   /** Map koleksi → fungsi render yang harus dipanggil */
@@ -70,12 +73,14 @@
     donors: ["renderDonationsTable", "initDashboard"],
     volunteers: ["renderVolunteersGrid", "initDashboard"],
     assignments: ["renderVolunteersGrid"],
+    users: ["renderUsersGrid", "renderContactsList"],
     announcements: ["renderAnnouncementsList"],
     pemasukan: ["initDashboard"],
     pengeluaran: ["initDashboard"],
     financeCategories: [],
     notifications: ["renderNotifications", "updateNotificationBadge"],
     approvalHistory: ["renderApprovalTab"],
+    deaths: ["renderDeathList"],
   };
 
   // =========================================================
@@ -141,6 +146,13 @@
       }
     });
 
+    if (typeof window.onUsersSnapshot === "function") {
+      const unsubUsers = window.onUsersSnapshot((users) => {
+        _handleCollectionUpdate("users", users);
+      });
+      _unsubscribers.push(unsubUsers);
+    }
+
     _listenIncomingMessages();
     // Juga dengarkan financeConfig (single doc) secara terpisah
     _listenFinanceConfig();
@@ -187,7 +199,14 @@
       const unsub = window.firebaseOnSnapshot(ref, (snap) => {
         if (snap.exists()) {
           const cfg = { id: snap.id, ...snap.data() };
-          if (window.dataCache) window.dataCache.finance = cfg;
+          if (typeof window.applyRealtimeFinanceConfig === "function") {
+            window.applyRealtimeFinanceConfig(cfg);
+          } else if (window.dataCache) {
+            window.dataCache.finance = cfg;
+          }
+          if (typeof window.refreshRealtimeUI === "function") {
+            window.refreshRealtimeUI("financeConfig");
+          }
         }
       });
       _unsubscribers.push(unsub);
@@ -207,7 +226,11 @@
     const cacheKey = COLLECTION_TO_CACHE_KEY[colName];
     if (!cacheKey) return;
 
-    window.dataCache[cacheKey] = docs;
+    if (typeof window.applyRealtimeCollectionUpdate === "function") {
+      window.applyRealtimeCollectionUpdate(cacheKey, docs);
+    } else {
+      window.dataCache[cacheKey] = docs;
+    }
 
     // Khusus notifications — update state internal app.js juga
     if (colName === "notifications") {
@@ -215,9 +238,13 @@
       return; // renderNotifications sudah dipanggil di dalam _syncNotificationsState
     }
 
-    // Trigger render fungsi yang relevan
+    if (typeof window.refreshRealtimeUI === "function") {
+      window.refreshRealtimeUI(colName);
+    }
+
+    // Fallback untuk versi app.js lama yang belum punya refreshRealtimeUI.
     const renders = COLLECTION_TO_RENDER[colName] || [];
-    renders.forEach((fnName) => {
+    if (typeof window.refreshRealtimeUI !== "function") renders.forEach((fnName) => {
       if (typeof window[fnName] === "function") {
         try {
           window[fnName]();

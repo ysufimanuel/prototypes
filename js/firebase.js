@@ -311,6 +311,22 @@ function onCollectionSnapshot(collectionName, callback) {
   }
 }
 
+function onUsersSnapshot(callback) {
+  if (!isFirebaseReady() || !_activeChurchId) return () => {};
+  try {
+    const usersQuery = window.firebaseQuery(
+      window.firebaseCollection(window.db, "users"),
+      window.firebaseWhere("churchId", "==", _activeChurchId),
+    );
+    return window.firebaseOnSnapshot(usersQuery, (snap) => {
+      callback(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+  } catch (error) {
+    console.error("[FIREBASE] onUsersSnapshot:", error);
+    return () => {};
+  }
+}
+
 async function batchWrite(operations) {
   if (!isFirebaseReady()) return false;
   try {
@@ -1032,6 +1048,7 @@ window.updateDocument = updateDocument;
 window.deleteDocument = deleteDocument;
 window.queryDocuments = queryDocuments;
 window.onCollectionSnapshot = onCollectionSnapshot;
+window.onUsersSnapshot = onUsersSnapshot;
 window.batchWrite = batchWrite;
 window.createChurch = createChurch;
 window.getChurch = getChurch;
