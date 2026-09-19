@@ -210,6 +210,39 @@ async function addDocument(collectionName, data) {
   }
 }
 
+// ========================================
+// CHAT MESSAGES â€” ROOT COLLECTION
+// ========================================
+
+async function addChatMessage(data) {
+  if (!isFirebaseReady()) return null;
+
+  try {
+    await waitForChurchId();
+
+    const d = {
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // CHAT disimpan di ROOT:
+    // /messages/{messageId}
+    const ref = await window.firebaseAddDoc(
+      window.firebaseCollection(window.db, "messages"),
+      d,
+    );
+
+    return {
+      id: ref.id,
+      ...d,
+    };
+  } catch (e) {
+    console.error("[FIREBASE] addChatMessage:", e);
+    return null;
+  }
+}
+
 async function setDocument(collectionName, docId, data) {
   if (!isFirebaseReady()) return false;
   try {
@@ -754,6 +787,7 @@ const DB_COLLECTIONS = {
   ASSIGNMENTS: "assignments",
   USERS: "users",
   ANNOUNCEMENTS: "announcements",
+  MESSAGES: "messages",
   PEMASUKAN: "pemasukan",
   PENGELUARAN: "pengeluaran",
   FINANCE_CATEGORIES: "financeCategories",
@@ -840,9 +874,74 @@ async function getAllUsersFromRoot() {
     return [];
   }
 }
+// ========================================
+// CHAT - GET MESSAGES ANTAR 2 USER
+// ROOT COLLECTION: /messages
+// ========================================
 
+async function getChatMessages(otherUid) {
+  if (!isFirebaseReady() || !_activeChurchId) {
+    return [];
+  }
+
+  if (!window.auth?.currentUser) {
+    console.error("[FIREBASE] getChatMessages: user belum login");
+    return [];
+  }
+
+  const currentUid = window.auth.currentUser.uid;
+
+  try {
+    const messagesRef = window.firebaseCollection(window.db, "messages");
+
+    // Pesan dari saya ke user lain
+    const sentQuery = window.firebaseQuery(
+      messagesRef,
+      window.firebaseWhere("churchId", "==", _activeChurchId),
+      window.firebaseWhere("senderId", "==", currentUid),
+      window.firebaseWhere("receiverId", "==", otherUid),
+    );
+
+    // Pesan dari user lain ke saya
+    const receivedQuery = window.firebaseQuery(
+      messagesRef,
+      window.firebaseWhere("churchId", "==", _activeChurchId),
+      window.firebaseWhere("senderId", "==", otherUid),
+      window.firebaseWhere("receiverId", "==", currentUid),
+    );
+
+    const [sentSnap, receivedSnap] = await Promise.all([
+      window.firebaseGetDocs(sentQuery),
+      window.firebaseGetDocs(receivedQuery),
+    ]);
+
+    const messages = [
+      ...sentSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })),
+      ...receivedSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })),
+    ];
+
+    messages.sort((a, b) => {
+      const timeA = new Date(a.timestamp || a.createdAt).getTime();
+      const timeB = new Date(b.timestamp || b.createdAt).getTime();
+
+      return timeA - timeB;
+    });
+
+    return messages;
+  } catch (e) {
+    console.error("[FIREBASE] getChatMessages:", e);
+    return [];
+  }
+}
 window.waitForChurchId = waitForChurchId;
 window.getAllUsersFromRoot = getAllUsersFromRoot;
+window.getChatMessages = getChatMessages;
 window.setActiveChurch = setActiveChurch;
 window.getActiveChurchId = getActiveChurchId;
 window.getAllDocuments = getAllDocuments;
@@ -872,6 +971,7 @@ window.getNotifications = getNotifications;
 window.addNotification = addNotification;
 window.markNotificationRead = markNotificationRead;
 window.deleteNotification = deleteNotification;
+window.addChatMessage = addChatMessage;
 
 console.log("[FIREBASE] Multi-tenant firebase.js loaded");
 

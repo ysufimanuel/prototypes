@@ -1382,6 +1382,7 @@ async function loadAllDataFromFirestore() {
       assignments,
       users,
       announcements,
+      messages,
       pemasukan,
       pengeluaran,
       financeCategories,
@@ -1399,6 +1400,7 @@ async function loadAllDataFromFirestore() {
       window.getAllDocuments(window.DB_COLLECTIONS.ASSIGNMENTS),
       window.getAllUsersFromRoot(),
       window.getAllDocuments(window.DB_COLLECTIONS.ANNOUNCEMENTS),
+      window.getAllDocuments(window.DB_COLLECTIONS.MESSAGES),
       window.getAllDocuments(window.DB_COLLECTIONS.PEMASUKAN),
       window.getAllDocuments(window.DB_COLLECTIONS.PENGELUARAN),
       window.getAllDocuments(window.DB_COLLECTIONS.FINANCE_CATEGORIES),
@@ -1420,6 +1422,7 @@ async function loadAllDataFromFirestore() {
       assignments: assignments || [],
       users: users || [],
       announcements: announcements || [],
+      messages: messages || [],
       pemasukan: pemasukan || [],
       pengeluaran: pengeluaran || [],
       financeCategories: financeCategories || [],
@@ -1518,6 +1521,7 @@ async function syncDataToFirestore(data) {
     volunteers: data.volunteers || [],
     assignments: data.assignments || [],
     announcements: data.announcements || [],
+    messages: data.messages || [],
     pemasukan: data.pemasukan || [],
     pengeluaran: data.pengeluaran || [],
     financeCategories: data.financeCategories || [],
@@ -1559,18 +1563,26 @@ async function syncDataToFirestore(data) {
 
 // Get data from cache or load from Firestore
 function getData() {
+  let data;
+
   if (dataCache) {
-    return dataCache;
+    data = dataCache;
+  } else {
+    try {
+      const storedData = localStorage.getItem("cmsV2Data");
+      data = storedData ? JSON.parse(storedData) : defaultData;
+    } catch (e) {
+      console.error("Error loading data:", e);
+      data = defaultData;
+    }
   }
 
-  // Fallback to localStorage
-  try {
-    const data = localStorage.getItem("cmsV2Data");
-    return data ? JSON.parse(data) : defaultData;
-  } catch (e) {
-    console.error("Error loading data:", e);
-    return defaultData;
+  // Pastikan messages selalu tersedia
+  if (!Array.isArray(data.messages)) {
+    data.messages = [];
   }
+
+  return data;
 }
 
 // Show/hide loading overlay
@@ -5360,92 +5372,195 @@ function renderContactsList() {
   const data = getData();
   const container = document.getElementById("contacts-list");
 
-  container.innerHTML =
-    data.members
-      .filter((m) => m.status === "aktif")
-      .map(
-        (m) => `
-        <div class="contact-item" onclick="openChat(${m.id})">
-            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(m.nama)}&background=ff6b00&color=fff&size=40" alt="">
-            <div class="contact-info">
-                <h4>${m.nama}</h4>
-                <p>${m.email}</p>
-            </div>
-        </div>
-    `,
-      )
-      .join("") ||
-    `<p class="text-center" style="padding: 20px; color: var(--text-muted);">${getLang("no-data") || "Tidak ada data"}</p>`;
-}
-
-function openChat(memberId) {
-  currentChatId = memberId;
-  const data = getData();
-  const member = data.members.find((m) => m.id === memberId);
-
-  if (!member) return;
-
-  document.getElementById("chat-header").innerHTML = `
-        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(member.nama)}&background=ff6b00&color=fff&size=40" alt="">
-        <div>
-            <h4>${member.nama}</h4>
-            <p class="status online">Online</p>
-        </div>
-    `;
-
-  document.getElementById("chat-input").style.display = "flex";
-  renderChatMessages();
-}
-
-function renderChatMessages() {
-  const data = getData();
-  const container = document.getElementById("chat-messages");
-
-  if (!currentChatId) return;
-
-  const messages = data.messages
-    .filter(
-      (m) =>
-        (m.senderId === currentUser.id && m.receiverId === currentChatId) ||
-        (m.senderId === currentChatId && m.receiverId === currentUser.id),
-    )
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const users = (data.users || []).filter(
+    (u) => u.uid && u.uid !== currentUser?.uid,
+  );
 
   container.innerHTML =
-    messages
-      .map((m) => {
-        const isMe = m.senderId === currentUser.id;
+    users
+      .map((u) => {
+        const uid = u.uid || u.id;
+        const nama = u.nama || u.name || u.username || "User";
+
         return `
-            <div class="message ${isMe ? "sent" : "received"}">
-                <p>${m.content}</p>
-                <span class="message-time">${formatTime(m.timestamp)}</span>
+          <div class="contact-item" onclick="openChat('${uid}')">
+            <img
+              src="https://ui-avatars.com/api/?name=${encodeURIComponent(
+                nama,
+              )}&background=ff6b00&color=fff&size=40"
+              alt=""
+            >
+
+            <div class="contact-info">
+              <h4>${nama}</h4>
+              <p>${u.email || ""}</p>
             </div>
+          </div>
         `;
       })
       .join("") ||
-    `<p class="text-center" style="padding: 20px; color: var(--text-muted);">${currentLanguage === "id" ? "Mulai percakapan" : "Start a conversation"}</p>`;
-
-  container.scrollTop = container.scrollHeight;
+    `<p class="text-center" style="padding:20px;color:var(--text-muted);">
+      ${getLang("no-data") || "Tidak ada user"}
+    </p>`;
 }
 
-function sendMessage() {
+async function openChat(userId) {
+  currentChatId = userId;
+
+  const data = getData();
+
+  const user = data.users?.find((u) => u.uid === userId || u.id === userId);
+
+  if (!user) {
+    console.error("[CHAT] User tidak ditemukan:", userId);
+    return;
+  }
+
+  const nama = user.nama || user.username || user.email || "User";
+
+  const header = document.getElementById("chat-header");
+
+  if (header) {
+    header.innerHTML = `
+      <img
+        src="https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=ff6b00&color=fff&size=40"
+        alt=""
+      >
+      <div>
+        <h4>${nama}</h4>
+        <p class="status online">Online</p>
+      </div>
+    `;
+  }
+
+  const inputArea = document.getElementById("chat-input");
+
+  if (inputArea) {
+    inputArea.style.display = "flex";
+  }
+
+  await renderChatMessages();
+}
+
+async function renderChatMessages() {
+  const container = document.getElementById("chat-messages");
+
+  if (!container || !currentChatId) return;
+
+  if (!window.auth?.currentUser) {
+    container.innerHTML = "";
+    return;
+  }
+
+  try {
+    container.innerHTML = `
+      <div style="text-align:center;padding:20px;">
+        Memuat pesan...
+      </div>
+    `;
+
+    const messages = await window.getChatMessages(currentChatId);
+
+    const currentUid = window.auth.currentUser.uid;
+
+    if (!messages.length) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:30px;color:#888;">
+          Belum ada pesan.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = messages
+      .map((message) => {
+        const isMine = message.senderId === currentUid;
+
+        const time = message.timestamp
+          ? new Date(message.timestamp).toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
+
+        return `
+          <div class="message ${isMine ? "sent" : "received"}">
+            <div class="message-content">
+              ${escapeHtml(message.content || "")}
+            </div>
+            <div class="message-time">
+              ${time}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    container.scrollTop = container.scrollHeight;
+  } catch (e) {
+    console.error("[CHAT] renderChatMessages:", e);
+
+    container.innerHTML = `
+      <div style="text-align:center;padding:20px;color:#d00;">
+        Gagal memuat pesan.
+      </div>
+    `;
+  }
+}
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+async function sendMessage() {
   const input = document.getElementById("message-text");
   const content = input.value.trim();
 
   if (!content || !currentChatId) return;
 
-  const data = getData();
-  data.messages.push({
-    id: Date.now(),
-    senderId: currentUser.id,
+  if (!window.auth?.currentUser) {
+    console.error("[CHAT] Firebase Auth belum login.");
+    return;
+  }
+
+  const senderId = window.auth.currentUser.uid;
+  const churchId = window.getActiveChurchId();
+
+  if (!churchId) {
+    console.error("[CHAT] churchId tidak tersedia.");
+    return;
+  }
+
+  const message = {
+    senderId,
     receiverId: currentChatId,
-    content: content,
+    churchId,
+    content,
     timestamp: new Date().toISOString(),
     read: false,
-  });
+  };
 
-  saveData(data);
+  const savedMessage = await window.addChatMessage(message);
+
+  if (!savedMessage) {
+    console.error("[CHAT] Gagal menyimpan pesan.");
+    return;
+  }
+
+  // Pastikan cache lokal tersedia
+  const data = getData();
+
+  if (!Array.isArray(data.messages)) {
+    data.messages = [];
+  }
+
+  data.messages.push(savedMessage);
+
   input.value = "";
+
   renderChatMessages();
 }
 
@@ -8857,33 +8972,60 @@ window.quickCheckIn = quickCheckIn;
 // ============================================================
 // MEMBERS
 // ============================================================
+
 window.showAddMemberModal = showAddMemberModal;
 window.filterMembers = filterMembers;
 window.searchMembers = searchMembers;
+
+window.editMember = editMember;
+window.viewMemberDetail = viewMemberDetail;
+window.saveMember = saveMember;
+window.deleteMember = deleteMember;
 window.toggleExportMenu = toggleExportMenu;
 window.exportData = exportData;
 
 // ============================================================
 // FAMILIES
 // ============================================================
+
 window.showAddFamilyModal = showAddFamilyModal;
 window.searchFamilies = searchFamilies;
+
+window.editFamily = editFamily;
+window.saveFamily = saveFamily;
+window.deleteFamily = deleteFamily;
+window.viewFamilyDetail = viewFamilyDetail;
 
 // ============================================================
 // GROUPS
 // ============================================================
+
 window.showAddGroupModal = showAddGroupModal;
 window.searchGroups = searchGroups;
 window.addMemberToGroup = addMemberToGroup;
 
+window.editGroup = editGroup;
+window.saveGroup = saveGroup;
+window.deleteGroup = deleteGroup;
+window.manageGroupMembers = manageGroupMembers;
+window.removeMemberFromGroup = removeMemberFromGroup;
+
 // ============================================================
 // EVENTS
 // ============================================================
+
 window.showAddEventModal = showAddEventModal;
 window.filterEvents = filterEvents;
 window.searchEvents = searchEvents;
 window.handleEventTypeChange = handleEventTypeChange;
 window.addParticipant = addParticipant;
+
+window.editEvent = editEvent;
+window.saveEvent = saveEvent;
+window.deleteEvent = deleteEvent;
+window.showEventParticipants = showEventParticipants;
+window.saveManualParticipant = saveManualParticipant;
+window.removeParticipant = removeParticipant;
 
 // ============================================================
 // ATTENDANCE
@@ -8896,9 +9038,14 @@ window.updateAttendanceChart = updateAttendanceChart;
 // ============================================================
 // DONATIONS
 // ============================================================
+
 window.showAddDonationModal = showAddDonationModal;
 window.filterDonations = filterDonations;
 window.handleDonationTypeChange = handleDonationTypeChange;
+
+window.editDonation = editDonation;
+window.saveDonation = saveDonation;
+window.deleteDonation = deleteDonation;
 
 // ============================================================
 // FINANCE
@@ -8930,6 +9077,7 @@ window.updateFinanceChart = updateFinanceChart;
 // ============================================================
 // VOLUNTEERS
 // ============================================================
+
 window.showVolunteersTab = showVolunteersTab;
 window.showAddVolunteerModal = showAddVolunteerModal;
 window.showAddAssignmentModal = showAddAssignmentModal;
@@ -8937,11 +9085,21 @@ window.searchVolunteers = searchVolunteers;
 window.handleVolunteerAreaChange = handleVolunteerAreaChange;
 window.toggleVolunteerSource = toggleVolunteerSource;
 
+window.editVolunteer = editVolunteer;
+window.saveVolunteer = saveVolunteer;
+window.deleteVolunteer = deleteVolunteer;
+window.showAssignments = showAssignments;
+
 // ============================================================
 // COMMUNICATION
 // ============================================================
+
 window.showCommunicationTab = showCommunicationTab;
 window.showAddAnnouncementModal = showAddAnnouncementModal;
+
+window.saveAnnouncement = saveAnnouncement;
+window.deleteAnnouncement = deleteAnnouncement;
+
 window.sendBroadcast = sendBroadcast;
 window.saveBroadcastDraft = saveBroadcastDraft;
 window.sendMessage = sendMessage;
@@ -8959,6 +9117,14 @@ window.exportLaporan = exportLaporan;
 window.updateLaporanView = updateLaporanView;
 
 // ============================================================
+// ASSIGNMENTS
+// ============================================================
+
+window.editAssignment = editAssignment;
+window.saveAssignment = saveAssignment;
+window.deleteAssignment = deleteAssignment;
+
+// ============================================================
 // USERS
 // ============================================================
 window.showAddUserModal = showAddUserModal;
@@ -8966,6 +9132,13 @@ window.searchUsers = searchUsers;
 window.editUser = editUser;
 window.saveUser = saveUser;
 window.deleteUser = deleteUser;
+
+// ============================================================
+// CHATS
+// ============================================================
+window.openChat = openChat;
+window.sendMessage = sendMessage;
+window.escapeHtml = escapeHtml;
 
 // ============================================================
 // DEATHS
