@@ -852,6 +852,7 @@ async function initDataCache() {
         // Load all data from Firestore
         console.log('[APP] Loading data from Firestore...');
         dataCache = await loadAllDataFromFirestore();
+        window.dataCache = dataCache;
 
         if (dataCache) {
             console.log('[APP] Data loaded successfully from Firestore');
@@ -859,6 +860,7 @@ async function initDataCache() {
         } else {
             console.log('[APP] Failed to load from Firestore, using localStorage');
             dataCache = initDataLocal();
+            window.dataCache = dataCache;
         }
 
         showLoading(false);
@@ -951,6 +953,7 @@ async function loadAllDataFromFirestore() {
 // Refresh data cache
 async function refreshDataCache() {
     dataCache = await loadAllDataFromFirestore();
+    window.dataCache = dataCache;
     return dataCache;
 }
 
@@ -991,12 +994,14 @@ function initDataLocal() {
         }
     }
     dataCache = JSON.parse(localStorage.getItem('cmsV2Data'));
+    window.dataCache = dataCache;
     return dataCache;
 }
 
 // Save data to Firestore or localStorage
 async function saveData(data) {
     dataCache = data;
+    window.dataCache = dataCache;
 
     if (isFirebaseReady()) {
         await syncDataToFirestore(data);
@@ -1173,6 +1178,8 @@ if (typeof window.isAuthReady !== 'function') {
 }
 
 let currentChatId = null;
+let chatMessages = [];
+let stopChatListener = null;
 let attendanceChart = null;
 let memberChart = null;
 let currentGroupId = null;
@@ -1261,6 +1268,7 @@ async function login(usernameOrEmail, password) {
 }
 
 async function logout() {
+    stopChatMessagesListener();
     if (window.isAuthReady && window.isAuthReady()) await window.logoutFromFirebase();
     currentUser = null;
     sessionStorage.removeItem('currentUser');
@@ -1288,6 +1296,7 @@ function checkSession() {
                             window.setActiveChurch(profile.churchId);
 
                             const { password: _p, ...safe } = profile;
+                            safe.uid = firebaseUser.uid;
                             currentUser = safe;
                             sessionStorage.setItem('currentUser', JSON.stringify(safe));
 
@@ -4007,53 +4016,100 @@ function renderContactsList() {
     const data = getData();
     const container = document.getElementById('contacts-list');
 
-    container.innerHTML = data.members.filter(m => m.status === 'aktif').map(m => `
-        <div class="contact-item" onclick="openChat(${m.id})">
-            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(m.nama)}&background=ff6b00&color=fff&size=40" alt="">
+    const contacts = (data.users || []).filter((user) => {
+        const uid = user.uid || user.id;
+        return uid && uid !== currentUser?.uid && user.status !== 'nonaktif';
+    });
+
+    container.innerHTML = contacts.map((user) => {
+        const uid = user.uid || user.id;
+        const name = user.nama || user.email || 'User';
+        const email = user.email || '';
+        return `
+        <div class="contact-item" onclick='openChat(${JSON.stringify(uid)})'>
+            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ff6b00&color=fff&size=40" alt="">
             <div class="contact-info">
-                <h4>${m.nama}</h4>
-                <p>${m.email}</p>
+                <h4>${escapeChatHtml(name)}</h4>
+                <p>${escapeChatHtml(email)}</p>
             </div>
         </div>
-    `).join('') || `<p class="text-center" style="padding: 20px; color: var(--text-muted);">${getLang('no-data') || 'Tidak ada data'}</p>`;
+    `;
+    }).join('') || `<p class="text-center" style="padding: 20px; color: var(--text-muted);">${currentLanguage === 'id' ? 'Tidak ada kontak chat' : 'No chat contacts'}</p>`;
 }
 
-function openChat(memberId) {
-    currentChatId = memberId;
-    const data = getData();
-    const member = data.members.find(m => m.id === memberId);
+function escapeChatHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    })[character]);
+}
 
-    if (!member) return;
+function stopChatMessagesListener() {
+    if (stopChatListener) {
+        stopChatListener();
+        stopChatListener = null;
+    }
+    chatMessages = [];
+}
+
+function openChat(userUid) {
+    const data = getData();
+    const user = (data.users || []).find((item) => (item.uid || item.id) === userUid);
+
+    if (!user || !currentUser?.uid || !window.listenToChatMessages) {
+        showToast(currentLanguage === 'id' ? 'Chat Firebase belum siap.' : 'Firebase chat is not ready.', 'error');
+        return;
+    }
+
+    currentChatId = userUid;
+    stopChatMessagesListener();
+
+    const name = user.nama || user.email || 'User';
 
     document.getElementById('chat-header').innerHTML = `
-        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(member.nama)}&background=ff6b00&color=fff&size=40" alt="">
+        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ff6b00&color=fff&size=40" alt="">
         <div>
-            <h4>${member.nama}</h4>
+            <h4>${escapeChatHtml(name)}</h4>
             <p class="status online">Online</p>
         </div>
     `;
 
     document.getElementById('chat-input').style.display = 'flex';
     renderChatMessages();
+
+    stopChatListener = window.listenToChatMessages(
+        userUid,
+        (messages) => {
+            if (currentChatId !== userUid) return;
+            chatMessages = messages;
+            renderChatMessages();
+        },
+        (error) => {
+            console.error('[CHAT] Listener error:', error);
+            showToast(
+                currentLanguage === 'id'
+                    ? 'Gagal memuat pesan. Periksa akses atau koneksi.'
+                    : 'Could not load messages. Check your access or connection.',
+                'error',
+            );
+        },
+    );
 }
 
 function renderChatMessages() {
-    const data = getData();
     const container = document.getElementById('chat-messages');
 
     if (!currentChatId) return;
 
-    const messages = data.messages.filter(m =>
-        (m.senderId === currentUser.id && m.receiverId === currentChatId) ||
-        (m.senderId === currentChatId && m.receiverId === currentUser.id)
-    ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    container.innerHTML = messages.map(m => {
-        const isMe = m.senderId === currentUser.id;
+    container.innerHTML = chatMessages.map((message) => {
+        const isMe = message.senderId === currentUser?.uid;
         return `
             <div class="message ${isMe ? 'sent' : 'received'}">
-                <p>${m.content}</p>
-                <span class="message-time">${formatTime(m.timestamp)}</span>
+                <p>${escapeChatHtml(message.content)}</p>
+                <span class="message-time">${formatTime(message.timestamp)}</span>
             </div>
         `;
     }).join('') || `<p class="text-center" style="padding: 20px; color: var(--text-muted);">${currentLanguage === 'id' ? 'Mulai percakapan' : 'Start a conversation'}</p>`;
@@ -4061,25 +4117,37 @@ function renderChatMessages() {
     container.scrollTop = container.scrollHeight;
 }
 
-function sendMessage() {
+async function sendMessage() {
     const input = document.getElementById('message-text');
     const content = input.value.trim();
 
-    if (!content || !currentChatId) return;
+    if (!content) {
+        showToast(currentLanguage === 'id' ? 'Pesan tidak boleh kosong.' : 'Message cannot be empty.', 'error');
+        return;
+    }
 
-    const data = getData();
-    data.messages.push({
-        id: Date.now(),
-        senderId: currentUser.id,
-        receiverId: currentChatId,
-        content: content,
-        timestamp: new Date().toISOString(),
-        read: false
-    });
+    if (!currentChatId) {
+        showToast(currentLanguage === 'id' ? 'Pilih kontak terlebih dahulu.' : 'Select a contact first.', 'error');
+        return;
+    }
 
-    saveData(data);
-    input.value = '';
-    renderChatMessages();
+    if (!currentUser?.uid || currentUser.uid !== window.auth?.currentUser?.uid) {
+        showToast(currentLanguage === 'id' ? 'Sesi login tidak valid.' : 'Your login session is invalid.', 'error');
+        return;
+    }
+
+    if (!window.getActiveChurchId?.()) {
+        showToast(currentLanguage === 'id' ? 'churchId aktif tidak ditemukan.' : 'Active churchId was not found.', 'error');
+        return;
+    }
+
+    try {
+        await window.addChatMessage({ receiverId: currentChatId, content });
+        input.value = '';
+    } catch (error) {
+        console.error('[CHAT] Send error:', error);
+        showToast(error.message || (currentLanguage === 'id' ? 'Gagal mengirim pesan.' : 'Could not send the message.'), 'error');
+    }
 }
 
 function renderAnnouncementsList() {
@@ -7047,6 +7115,7 @@ window.showAddAnnouncementModal = showAddAnnouncementModal;
 window.sendBroadcast = sendBroadcast;
 window.saveBroadcastDraft = saveBroadcastDraft;
 window.sendMessage = sendMessage;
+window.openChat = openChat;
 window.searchContacts = searchContacts;
 window.refreshContacts = refreshContacts;
 

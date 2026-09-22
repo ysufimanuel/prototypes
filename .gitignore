@@ -1,0 +1,9 @@
+node_modules/
+.env
+churchmanagementsystem-a77a3-firebase-adminsdk-fbsvc-2ce944832f.json
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+firebase-debug*.log
+firestore-debug*.log
+*.pem
+*.key

@@ -243,6 +243,129 @@ function onCollectionSnapshot(collectionName, callback) {
     }
 }
 
+// ========================================
+// CHAT — ROOT COLLECTION, SCOPED BY UID + CHURCH
+// ========================================
+
+function getChatContext(peerUid) {
+    const senderId = window.auth?.currentUser?.uid;
+    const churchId = getActiveChurchId();
+
+    if (!isFirebaseReady() || !isAuthReady() || !senderId) {
+        throw new Error('Anda harus login untuk menggunakan chat.');
+    }
+
+    if (!churchId) {
+        throw new Error('churchId aktif tidak ditemukan.');
+    }
+
+    if (typeof peerUid !== 'string' || peerUid.trim() === '') {
+        throw new Error('User tujuan chat tidak valid.');
+    }
+
+    if (peerUid === senderId) {
+        throw new Error('Anda tidak dapat mengirim pesan ke diri sendiri.');
+    }
+
+    return { senderId, churchId, peerUid };
+}
+
+async function addChatMessage({ receiverId, content }) {
+    const { senderId, churchId, peerUid } = getChatContext(receiverId);
+    const message = typeof content === 'string' ? content.trim() : '';
+
+    if (!message) {
+        throw new Error('Pesan tidak boleh kosong.');
+    }
+
+    if (message.length > 2000) {
+        throw new Error('Pesan maksimal 2000 karakter.');
+    }
+
+    const payload = {
+        senderId,
+        receiverId: peerUid,
+        churchId,
+        content: message,
+        timestamp: new Date().toISOString(),
+        read: false,
+    };
+
+    const ref = await window.firebaseAddDoc(
+        window.firebaseCollection(window.db, 'messages'),
+        payload,
+    );
+
+    return { id: ref.id, ...payload };
+}
+
+function listenToChatMessages(peerUid, callback, onError = () => {}) {
+    let context;
+    try {
+        context = getChatContext(peerUid);
+    } catch (error) {
+        onError(error);
+        return () => {};
+    }
+
+    const messages = window.firebaseCollection(window.db, 'messages');
+    const byTimestamp = window.firebaseOrderBy('timestamp', 'asc');
+    const sentQuery = window.firebaseQuery(
+        messages,
+        window.firebaseWhere('churchId', '==', context.churchId),
+        window.firebaseWhere('senderId', '==', context.senderId),
+        window.firebaseWhere('receiverId', '==', context.peerUid),
+        byTimestamp,
+    );
+    const receivedQuery = window.firebaseQuery(
+        messages,
+        window.firebaseWhere('churchId', '==', context.churchId),
+        window.firebaseWhere('senderId', '==', context.peerUid),
+        window.firebaseWhere('receiverId', '==', context.senderId),
+        byTimestamp,
+    );
+
+    let sent = [];
+    let received = [];
+    let active = true;
+
+    const publish = () => {
+        if (!active) return;
+        callback(
+            [...sent, ...received].sort((a, b) =>
+                String(a.timestamp).localeCompare(String(b.timestamp)),
+            ),
+        );
+    };
+
+    const handleError = (error) => {
+        if (active) onError(error);
+    };
+
+    const stopSent = window.firebaseOnSnapshot(
+        sentQuery,
+        (snapshot) => {
+            sent = snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }));
+            publish();
+        },
+        handleError,
+    );
+    const stopReceived = window.firebaseOnSnapshot(
+        receivedQuery,
+        (snapshot) => {
+            received = snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }));
+            publish();
+        },
+        handleError,
+    );
+
+    return () => {
+        active = false;
+        stopSent();
+        stopReceived();
+    };
+}
+
 async function batchWrite(operations) {
     if (!isFirebaseReady()) return false;
     try {
@@ -793,6 +916,8 @@ window.getNotifications        = getNotifications;
 window.addNotification         = addNotification;
 window.markNotificationRead    = markNotificationRead;
 window.deleteNotification      = deleteNotification;
+window.addChatMessage          = addChatMessage;
+window.listenToChatMessages    = listenToChatMessages;
 
 console.log('[FIREBASE] Multi-tenant firebase.js loaded');
 

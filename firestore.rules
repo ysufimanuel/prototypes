@@ -1,0 +1,530 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // AUTH / USER HELPERS
+    // =========================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userExists() {
+      return isAuthenticated()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        );
+    }
+
+    function getUserProfile() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    function belongsToChurch(churchId) {
+      return userExists()
+        && getUserProfile().churchId == churchId;
+    }
+
+    function isAdmin(churchId) {
+      return belongsToChurch(churchId)
+        && getUserProfile().role in ['admin', 'superadmin'];
+    }
+
+    function isSuperAdmin(churchId) {
+      return belongsToChurch(churchId)
+        && getUserProfile().role == 'superadmin';
+    }
+
+    // User yang memiliki akun CMS / User Management
+    function isChatUser() {
+      return userExists()
+        && getUserProfile().churchId != null;
+    }
+
+
+    // =========================================================
+    // USERS
+    // =========================================================
+
+    match /users/{uid} {
+
+      // -------------------------------------------------------
+      // READ
+      //
+      // Semua user yang memiliki akun boleh melihat profile
+      // user lain yang berada di gereja yang sama.
+      //
+      // Ini diperlukan supaya contact list bisa muncul untuk:
+      // - Super Admin
+      // - Admin
+      // - User
+      // -------------------------------------------------------
+
+      allow read: if isAuthenticated()
+        && (
+          // Boleh baca profile sendiri
+          request.auth.uid == uid
+
+          ||
+
+          // Boleh baca user lain dalam gereja yang sama
+          (
+            userExists()
+            && resource.data.churchId == getUserProfile().churchId
+          )
+        );
+
+
+      // -------------------------------------------------------
+      // CREATE
+      // -------------------------------------------------------
+
+      allow create: if isAuthenticated()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && (
+          // Registrasi Super Admin
+          (
+            request.resource.data.role == 'superadmin'
+            &&
+            exists(
+              /databases/$(database)/documents/churches/$(request.resource.data.churchId)
+            )
+            &&
+            get(
+              /databases/$(database)/documents/churches/$(request.resource.data.churchId)
+            ).data.superadminUid == uid
+          )
+
+          ||
+
+          // User dibuat oleh Admin / Super Admin
+          (
+            exists(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            )
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.churchId == request.resource.data.churchId
+            &&
+            get(
+              /databases/$(database)/documents/users/$(request.auth.uid)
+            ).data.role in ['admin', 'superadmin']
+            &&
+            request.resource.data.role == 'user'
+          )
+        );
+
+
+      // -------------------------------------------------------
+      // UPDATE OWN PROFILE
+      //
+      // User boleh mengubah data profil biasa miliknya,
+      // tetapi tidak boleh mengubah:
+      // uid
+      // role
+      // churchId
+      // status
+      // createdAt
+      // -------------------------------------------------------
+
+      allow update: if isAuthenticated()
+        && request.auth.uid == uid
+        && !request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasAny([
+            'uid',
+            'role',
+            'churchId',
+            'status',
+            'createdAt'
+          ]);
+
+
+      // -------------------------------------------------------
+      // UPDATE USER LAIN OLEH SUPER ADMIN
+      //
+      // Super Admin boleh mengubah user lain dalam gereja
+      // yang sama.
+      //
+      // UID dan churchId tidak boleh dipindahkan.
+      // -------------------------------------------------------
+
+      allow update: if isAuthenticated()
+        && userExists()
+        && getUserProfile().role == 'superadmin'
+        && request.auth.uid != uid
+        && resource.data.churchId == getUserProfile().churchId
+        && request.resource.data.churchId == resource.data.churchId
+        && request.resource.data.uid == resource.data.uid;
+
+
+      // -------------------------------------------------------
+      // DELETE
+      //
+      // Hanya Super Admin.
+      // Tidak boleh menghapus dirinya sendiri.
+      // -------------------------------------------------------
+
+      allow delete: if isAuthenticated()
+        && userExists()
+        && getUserProfile().role == 'superadmin'
+        && request.auth.uid != uid
+        && resource.data.churchId == getUserProfile().churchId;
+    }
+
+
+    // =========================================================
+    // MESSAGES / CHAT
+    // =========================================================
+
+    match /messages/{messageId} {
+
+      // -------------------------------------------------------
+      // READ MESSAGE
+      //
+      // Hanya user yang memiliki akun.
+      //
+      // User hanya boleh membaca pesan:
+      // - yang dia kirim
+      // - atau yang dia terima
+      //
+      // Dan harus berasal dari gereja yang sama.
+      // -------------------------------------------------------
+
+      allow read: if isChatUser()
+        && resource.data.churchId == getUserProfile().churchId
+        && (
+          resource.data.senderId == request.auth.uid
+          ||
+          resource.data.receiverId == request.auth.uid
+        );
+
+
+      // -------------------------------------------------------
+      // CREATE MESSAGE
+      //
+      // Pengirim harus:
+      // - authenticated
+      // - memiliki profile /users
+      // - senderId harus UID dirinya
+      // - churchId harus gerejanya
+      // - receiver bukan dirinya sendiri
+      // - receiver harus memiliki akun
+      // - receiver harus berada di gereja yang sama
+      // -------------------------------------------------------
+
+      allow create: if isChatUser()
+        && request.resource.data.keys().hasOnly([
+          'senderId', 'receiverId', 'churchId', 'content', 'timestamp', 'read'
+        ])
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.churchId == getUserProfile().churchId
+        && request.resource.data.receiverId != request.auth.uid
+        && request.resource.data.senderId is string
+        && request.resource.data.receiverId is string
+        && request.resource.data.churchId is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 2000
+        && request.resource.data.timestamp is string
+        && request.resource.data.read == false
+
+        && exists(
+          /databases/$(database)/documents/users/$(request.resource.data.receiverId)
+        )
+
+        && get(
+          /databases/$(database)/documents/users/$(request.resource.data.receiverId)
+        ).data.churchId == getUserProfile().churchId;
+
+
+      // -------------------------------------------------------
+      // UPDATE
+      //
+      // Untuk sekarang pesan immutable.
+      // -------------------------------------------------------
+
+      allow update: if false;
+
+
+      // -------------------------------------------------------
+      // DELETE
+      // -------------------------------------------------------
+
+      allow delete: if false;
+    }
+
+
+    // =========================================================
+    // CHURCH ROOT
+    // =========================================================
+
+    match /churches/{churchId} {
+    
+      // -------------------------------------------------------
+      // CHURCH READ
+      // -------------------------------------------------------
+
+      allow read: if belongsToChurch(churchId);
+
+
+      // -------------------------------------------------------
+      // CHURCH CREATE
+      //
+      // Hanya user authenticated yang belum mempunyai profile.
+      // Biasanya untuk proses registrasi awal Super Admin.
+      // -------------------------------------------------------
+
+      allow create: if isAuthenticated()
+        && !exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        );
+
+
+      // -------------------------------------------------------
+      // CHURCH UPDATE
+      // -------------------------------------------------------
+
+      allow update: if isSuperAdmin(churchId);
+
+
+      // -------------------------------------------------------
+      // CHURCH DELETE
+      // -------------------------------------------------------
+
+      allow delete: if false;
+
+
+      // =======================================================
+      // MEMBERS
+      // =======================================================
+
+      match /members/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // FAMILIES
+      // =======================================================
+
+      match /families/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // GROUPS
+      // =======================================================
+
+      match /groups/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // EVENTS
+      // =======================================================
+
+      match /events/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // ATTENDANCE
+      // =======================================================
+
+      match /attendance/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // DONATIONS
+      // =======================================================
+
+      match /donations/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // DONORS
+      // =======================================================
+
+      match /donors/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // VOLUNTEERS
+      // =======================================================
+
+      match /volunteers/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // ASSIGNMENTS
+      // =======================================================
+
+      match /assignments/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // ANNOUNCEMENTS
+      // =======================================================
+
+      match /announcements/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+      
+      // =======================================================
+      // Notification
+      // =======================================================
+match /notifications/{docId} {
+  allow read: if belongsToChurch(churchId);
+  allow create: if belongsToChurch(churchId);
+  allow update: if belongsToChurch(churchId);
+  allow delete: if isSuperAdmin(churchId);
+}
+      // =======================================================
+      // PEMASUKAN
+      // =======================================================
+
+      match /pemasukan/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // PENGELUARAN
+      // =======================================================
+
+      match /pengeluaran/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // FINANCE CATEGORIES
+      // =======================================================
+
+      match /financeCategories/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // FINANCE CONFIG
+      // =======================================================
+
+      match /financeConfig/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update: if isAdmin(churchId);
+
+        allow delete: if isSuperAdmin(churchId);
+      }
+
+
+      // =======================================================
+      // APPROVAL HISTORY
+      // =======================================================
+
+      match /approvalHistory/{docId} {
+
+        allow read: if belongsToChurch(churchId);
+
+        allow create, update, delete: if isSuperAdmin(churchId);
+      }
+    }
+
+
+    // =========================================================
+    // DEFAULT DENY
+    // =========================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+   }
+  }
