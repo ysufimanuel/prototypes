@@ -626,12 +626,15 @@ async function deleteChurchUser(uid) {
   try {
     const token = await auth.currentUser.getIdToken();
 
-    const response = await fetch(`api/admin/users/${encodeURIComponent(uid)}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      `/api/admin/users/${encodeURIComponent(uid)}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
-    });
+    );
 
     const result = await response.json();
 
