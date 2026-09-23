@@ -534,24 +534,21 @@ async function createChurchUser(userData) {
   try {
     const token = await auth.currentUser.getIdToken();
 
-    const response = await fetch(
-      "http://localhost:3000/api/admin/create-user",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nama: userData.nama,
-          username: userData.username,
-          email: userData.email,
-          password: userData.password,
-          role: userData.role,
-          churchId: _activeChurchId,
-        }),
+    const response = await fetch("/api/admin/create-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-    );
+      body: JSON.stringify({
+        nama: userData.nama,
+        username: userData.username,
+        email: userData.email,
+        password: userData.password,
+        role: userData.role,
+        churchId: _activeChurchId,
+      }),
+    });
 
     const result = await response.json();
 
@@ -583,7 +580,7 @@ async function updateChurchUser(uid, userData) {
     const token = await auth.currentUser.getIdToken();
 
     const response = await fetch(
-      `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
+      `/api/admin/users/${encodeURIComponent(uid)}`,
       {
         method: "PATCH",
         headers: {
@@ -629,15 +626,12 @@ async function deleteChurchUser(uid) {
   try {
     const token = await auth.currentUser.getIdToken();
 
-    const response = await fetch(
-      `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    const response = await fetch(`api/admin/users/${encodeURIComponent(uid)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    );
+    });
 
     const result = await response.json();
 
