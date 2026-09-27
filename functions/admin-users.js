@@ -28,13 +28,6 @@ router.post('/create-user', requireSuperAdmin, async (req, res) => {
             });
         }
 
-        if (typeof password !== 'string' || password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: 'Password minimal 6 karakter.'
-            });
-        }
-
         const allowedRoles = ['user', 'admin', 'superadmin'];
 
         if (!allowedRoles.includes(role)) {
@@ -99,6 +92,10 @@ router.post('/create-user', requireSuperAdmin, async (req, res) => {
             .doc(firebaseUser.uid)
             .set(userData);
 
+        console.log(
+            `[ADMIN] CREATE USER OK: ${firebaseUser.uid} | role=${role}`
+        );
+
         return res.status(201).json({
             success: true,
             message: 'User berhasil dibuat.',
@@ -106,12 +103,11 @@ router.post('/create-user', requireSuperAdmin, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[ADMIN] CREATE USER ERROR', { code: error.code, message: error.message });
+        console.error('[ADMIN] CREATE USER ERROR:', error);
 
-        const status = error.code === 'auth/email-already-exists' ? 409 : 500;
-        return res.status(status).json({
+        return res.status(500).json({
             success: false,
-            message: status === 409 ? 'Email sudah digunakan.' : 'Gagal membuat user.'
+            message: error.message || 'Gagal membuat user.'
         });
     }
 });
@@ -132,6 +128,11 @@ router.patch('/users/:uid', requireSuperAdmin, async (req, res) => {
             email,
             role
         } = req.body;
+
+        console.log(
+            `[ADMIN] PATCH USER REQUEST: uid=${uid}`,
+            req.body
+        );
 
         if (!uid || !nama || !username || !email || !role) {
             return res.status(400).json({
@@ -244,6 +245,10 @@ router.patch('/users/:uid', requireSuperAdmin, async (req, res) => {
 
         const verifiedUser = verifySnap.data();
 
+        console.log(
+            `[ADMIN] PATCH USER OK: ${uid} | role=${verifiedUser.role}`
+        );
+
         return res.status(200).json({
             success: true,
             message: 'User berhasil diperbarui.',
@@ -254,12 +259,11 @@ router.patch('/users/:uid', requireSuperAdmin, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[ADMIN] PATCH USER ERROR', { code: error.code, message: error.message });
+        console.error('[ADMIN] PATCH USER ERROR:', error);
 
-        const status = error.code === 'auth/email-already-exists' ? 409 : 500;
-        return res.status(status).json({
+        return res.status(500).json({
             success: false,
-            message: status === 409 ? 'Email sudah digunakan.' : 'Gagal memperbarui user.'
+            message: error.message || 'Gagal memperbarui user.'
         });
     }
 });
@@ -274,17 +278,14 @@ router.delete('/users/:uid', requireSuperAdmin, async (req, res) => {
     try {
         const { uid } = req.params;
 
+        console.log(
+            `[ADMIN] DELETE USER REQUEST: uid=${uid}`
+        );
+
         if (!uid) {
             return res.status(400).json({
                 success: false,
                 message: 'UID user tidak ditemukan.'
-            });
-        }
-
-        if (req.user?.uid === uid) {
-            return res.status(403).json({
-                success: false,
-                message: 'Super Admin tidak dapat menghapus akun sendiri.'
             });
         }
 
@@ -317,11 +318,18 @@ router.delete('/users/:uid', requireSuperAdmin, async (req, res) => {
         try {
             await auth.deleteUser(uid);
 
+            console.log(
+                `[ADMIN] AUTH DELETE OK: ${uid}`
+            );
+
         } catch (authError) {
 
             // Kalau user Auth sudah tidak ada,
             // tetap lanjut hapus Firestore.
             if (authError.code === 'auth/user-not-found') {
+                console.log(
+                    `[ADMIN] AUTH USER SUDAH TIDAK ADA: ${uid}`
+                );
             } else {
                 throw authError;
             }
@@ -330,6 +338,10 @@ router.delete('/users/:uid', requireSuperAdmin, async (req, res) => {
         // Hapus Firestore profile
         await userRef.delete();
 
+        console.log(
+            `[ADMIN] FIRESTORE DELETE OK: ${uid}`
+        );
+
         return res.status(200).json({
             success: true,
             message: 'User berhasil dihapus.',
@@ -337,11 +349,11 @@ router.delete('/users/:uid', requireSuperAdmin, async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[ADMIN] DELETE USER ERROR', { code: error.code, message: error.message });
+        console.error('[ADMIN] DELETE USER ERROR:', error);
 
         return res.status(500).json({
             success: false,
-            message: 'Gagal menghapus user.'
+            message: error.message || 'Gagal menghapus user.'
         });
     }
 });

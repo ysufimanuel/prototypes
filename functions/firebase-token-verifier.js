@@ -18,7 +18,7 @@ async function verifyFirebaseIdToken(idToken) {
 
     return decodedToken;
   } catch (error) {
-    console.error("Firebase ID token verification gagal", { message: error.message });
+    console.error("Firebase ID token verification gagal:", error.message);
 
     throw new Error("Firebase ID token tidak valid atau sudah expired");
   }

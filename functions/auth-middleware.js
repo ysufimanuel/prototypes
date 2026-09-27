@@ -26,9 +26,17 @@ async function requireSuperAdmin(req, res, next) {
       });
     }
 
+    console.log("[AUTH] STEP 1 - mulai verify token");
+
     const decoded = await verifyFirebaseIdToken(idToken);
 
+    console.log("[AUTH] STEP 1 OK - UID:", decoded.uid);
+
+    console.log("[AUTH] STEP 2 - mulai Firestore lookup");
+
     const userSnap = await db.collection("users").doc(decoded.uid).get();
+
+    console.log("[AUTH] STEP 2 OK - exists:", userSnap.exists);
 
     if (!userSnap.exists) {
       return res.status(403).json({
@@ -69,7 +77,7 @@ async function requireSuperAdmin(req, res, next) {
 
     next();
   } catch (error) {
-    console.error("Auth middleware error", { message: error.message });
+    console.error("Auth middleware error:", error.message);
 
     return res.status(401).json({
       success: false,
