@@ -562,10 +562,26 @@ async function createChurchUser(userData) {
       },
     );
 
-    const result = await response.json();
+    const responseText = await response.text();
+    let result = null;
+
+    try {
+      result = JSON.parse(responseText);
+    } catch (_) {
+      if (response.status === 404) {
+        throw new Error(
+          "Backend create-user belum aktif (API /api/admin/create-user 404). Deploy Firebase Functions terlebih dahulu.",
+        );
+      }
+      throw new Error(
+        "Server mengembalikan response yang tidak valid (" +
+          response.status +
+          ").",
+      );
+    }
 
     if (!response.ok) {
-      throw new Error(result.error || "Gagal membuat user.");
+      throw new Error(result?.message || result?.error || "Gagal membuat user.");
     }
 
     return result.user;
