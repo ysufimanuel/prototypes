@@ -449,9 +449,9 @@
     // NOTIFICATION PERSISTENT
     // ==========================================
 
-    if (window.addNotification) {
+    if (window.firestoreAddNotification) {
       try {
-        await window.addNotification({
+        await window.firestoreAddNotification({
           title: "💬 Pesan Baru",
           message: `${senderName}: ${message.content || ""}`,
           type: "message",
@@ -467,7 +467,7 @@
         console.error("[RTFB] Gagal membuat notification pesan:", e);
       }
     } else {
-      console.warn("[RTFB] window.addNotification tidak tersedia");
+      console.warn("[RTFB] window.firestoreAddNotification tidak tersedia");
     }
   }
   const activeChatId = window.getCurrentChatId?.();
@@ -553,7 +553,7 @@
    */
   async function _checkBirthdays(members) {
     if (!window.isFirebaseReady || !window.isFirebaseReady()) return;
-    if (!window.addNotification) return;
+    if (!window.firestoreAddNotification) return;
 
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
