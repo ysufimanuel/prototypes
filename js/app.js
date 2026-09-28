@@ -915,8 +915,7 @@ async function saveData(data) {
   dataCache = data;
 
   if (isFirebaseReady()) {
-    await syncDataToFirestore(data);
-    return true;
+    return await syncDataToFirestore(data);
   }
 
   // Fallback to localStorage
@@ -989,8 +988,10 @@ async function syncDataToFirestore(data) {
   try {
     await batch.commit();
     console.log("[APP] Data berhasil disinkronkan ke Firestore");
+    return true;
   } catch (e) {
     console.error("[APP] Gagal sinkronisasi batch:", e);
+    return false;
   }
 }
 
