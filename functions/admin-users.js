@@ -10,8 +10,6 @@ function validateRole(role) {
 }
 
 function sameChurch(req, user) {
-  // A missing churchId must never grant access. User-management operations
-  // are tenant-scoped and must match the authenticated superadmin exactly.
   return Boolean(
     req.user?.churchId &&
       user?.churchId &&
@@ -23,10 +21,6 @@ function roleError() {
   return `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}`;
 }
 
-// CREATE USER
-// Only a superadmin may create accounts, including accounts with admin or
-// superadmin privileges. The requested church is always forced to the
-// authenticated superadmin's church.
 router.post("/create-user", requireSuperAdmin, async (req, res) => {
   try {
     const { nama, username, email, password, role, churchId } = req.body;
@@ -89,9 +83,6 @@ router.post("/create-user", requireSuperAdmin, async (req, res) => {
   }
 });
 
-// UPDATE USER
-// This endpoint is intentionally protected as a whole: only a superadmin
-// can edit users, and therefore only a superadmin can change roles.
 router.patch("/users/:uid", requireSuperAdmin, async (req, res) => {
   try {
     const { uid } = req.params;
@@ -122,8 +113,6 @@ router.patch("/users/:uid", requireSuperAdmin, async (req, res) => {
     if (role !== undefined && !validateRole(role)) {
       return res.status(400).json({ success: false, message: roleError() });
     }
-    // A superadmin may change admin <-> user/superadmin, but cannot remove
-    // their own last administrative identity by changing their own role.
     if (isSelf && role !== undefined && role !== existingUser.role) {
       return res.status(403).json({
         success: false,
@@ -191,7 +180,6 @@ router.patch("/users/:uid", requireSuperAdmin, async (req, res) => {
   }
 });
 
-// DELETE USER
 router.delete("/users/:uid", requireSuperAdmin, async (req, res) => {
   try {
     const { uid } = req.params;
