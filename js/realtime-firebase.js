@@ -36,7 +36,6 @@
     "pemasukan",
     "pengeluaran",
     "financeCategories",
-    "notifications",
     "approvalHistory",
     "deaths",
   ];
@@ -92,7 +91,10 @@
   let _birthdayCheckDate = null; // tanggal terakhir dicek
   let _chatNotificationUnsubscribe = null;
   let _chatNotificationInitialized = false;
+  let _notificationUnsubscribers = [];
   const _initializedCollections = new Set();
+  let _privateNotifications = [];
+  let _churchNotifications = [];
   // =========================================================
   // UTIL — tunggu sampai kondisi terpenuhi
   // =========================================================
@@ -154,6 +156,7 @@
       _unsubscribers.push(unsubUsers);
     }
 
+    _listenNotifications();
     _listenIncomingMessages();
     // Juga dengarkan financeConfig (single doc) secara terpisah
     _listenFinanceConfig();
@@ -169,6 +172,12 @@
       } catch (_) {}
     });
     _unsubscribers = [];
+    _notificationUnsubscribers.forEach((fn) => {
+      try {
+        fn();
+      } catch (_) {}
+    });
+    _notificationUnsubscribers = [];
     _initializedCollections.clear();
 
     if (_chatNotificationUnsubscribe) {
@@ -281,33 +290,77 @@
   // =========================================================
 
   function _syncNotificationsState(docs) {
-    // app.js menyimpan notifications & unreadCount di scope-nya
-    // Kita update lewat window jika tersedia, atau lewat loadNotifications()
-    if (typeof window.loadNotifications === "function") {
-      // loadNotifications sudah mengambil dari Firebase — panggil saja
-      // Tapi ini async dan akan re-fetch; lebih efisien update langsung:
-      try {
-        // Update variabel internal jika bisa
-        const currentUid = window.auth?.currentUser?.uid;
-        const visibleDocs = (docs || []).filter(
-          (notification) =>
-            !notification.userId ||
-            !currentUid ||
-            notification.userId === currentUid,
-        );
-        const sorted = [...visibleDocs].sort(
-          (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
-        );
-        // Coba set via setter jika ada, atau fallback ke loadNotifications
-        if (typeof window._setNotificationsState === "function") {
-          window._setNotificationsState(sorted);
-        } else {
-          window.loadNotifications();
-        }
-      } catch (_) {
-        window.loadNotifications();
-      }
+    if (typeof window._setNotificationsState === "function") {
+      const sorted = [...(docs || [])].sort(
+        (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+      );
+      window._setNotificationsState(sorted);
     }
+  }
+
+  function _listenNotifications() {
+    if (
+      !window.firebaseOnSnapshot ||
+      !window.firebaseCollection ||
+      !window.firebaseQuery ||
+      !window.firebaseWhere ||
+      !window.db ||
+      !window.auth?.currentUser ||
+      !window.getActiveChurchId
+    ) {
+      return;
+    }
+
+    const notificationsRef = window.firebaseCollection(
+      window.db,
+      "churches",
+      window.getActiveChurchId(),
+      "notifications",
+    );
+
+    const currentUid = window.auth.currentUser.uid;
+    const privateQuery = window.firebaseQuery(
+      notificationsRef,
+      window.firebaseWhere("userId", "==", currentUid),
+    );
+    const churchQuery = window.firebaseQuery(
+      notificationsRef,
+      window.firebaseWhere("userId", "==", null),
+    );
+
+    const emit = () => {
+      const unique = new Map();
+      [..._privateNotifications, ..._churchNotifications].forEach((notification) => {
+        unique.set(notification.id, notification);
+      });
+      _syncNotificationsState([...unique.values()]);
+    };
+
+    const unsubPrivate = window.firebaseOnSnapshot(
+      privateQuery,
+      (snap) => {
+        _privateNotifications = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        emit();
+      },
+      (error) => console.error("[RTFB] Private notification listener:", error),
+    );
+
+    const unsubChurch = window.firebaseOnSnapshot(
+      churchQuery,
+      (snap) => {
+        _churchNotifications = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        emit();
+      },
+      (error) => console.error("[RTFB] Church notification listener:", error),
+    );
+
+    _notificationUnsubscribers = [unsubPrivate, unsubChurch];
   }
 
   function _listenIncomingMessages() {
@@ -547,17 +600,20 @@
       const age = _calcAge(member.tglLahir);
       const ageText = age > 0 ? ` (${age} tahun)` : "";
 
-      await window.addNotification({
+      const birthdayNotification = {
         title: "🎂 Ulang Tahun Jemaat",
         message: `${member.nama}${ageText} berulang tahun hari ini! Berikan ucapan selamat.`,
         type: "birthday",
         memberId: String(member.id),
         date: todayStr,
         timestamp: new Date().toISOString(),
-        read: false,
-      });
+      };
 
-      console.log(`[RTFB] Notifikasi ulang tahun dikirim: ${member.nama}`);
+      if (typeof window._addLocalNotification === "function") {
+        window._addLocalNotification(birthdayNotification);
+      }
+
+      console.log(`[RTFB] Notifikasi ulang tahun lokal: ${member.nama}`);
     }
 
     // Tampilkan toast ringkasan
