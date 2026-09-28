@@ -751,17 +751,19 @@ async function migrateFromLocalStorage() {
 async function getNotifications(userId = null) {
   if (!isFirebaseReady()) return [];
   try {
-    const notifs = userId
-      ? await queryDocuments("notifications", "userId", "==", userId)
-      : await getAllDocuments("notifications");
+    const currentUid = userId || window.auth?.currentUser?.uid;
+    if (!currentUid) return [];
 
-    // Chat notifications are private to the recipient.
-    // Church-wide notifications keep working when userId is absent.
-    const currentUid = window.auth?.currentUser?.uid || userId;
-    return notifs
-      .filter((n) => !n.userId || !currentUid || n.userId === currentUid)
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const [privateNotifs, churchNotifs] = await Promise.all([
+      queryDocuments("notifications", "userId", "==", currentUid),
+      queryDocuments("notifications", "userId", "==", null),
+    ]);
+
+    return [...privateNotifs, ...churchNotifs].sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+    );
   } catch (e) {
+    console.error("[FIREBASE] getNotifications:", e);
     return [];
   }
 }
@@ -790,6 +792,8 @@ async function addNotification(data) {
   }
   return addDocument("notifications", {
     ...data,
+    // null = church-wide notification; UID = private notification.
+    userId: data.userId ?? null,
     timestamp: data.timestamp || new Date().toISOString(),
     read: false,
   });
