@@ -767,7 +767,7 @@ async function getNotifications(userId = null) {
   }
 }
 
-async function addNotification(data) {
+async function firestoreAddNotification(data) {
   // Deduplikasi notifikasi ulang tahun: cek apakah sudah ada
   // notifikasi dengan type=birthday, memberId, dan date yang sama hari ini
   if (data.type === "birthday" && data.memberId && data.date) {
@@ -798,11 +798,11 @@ async function addNotification(data) {
   });
 }
 
-async function markNotificationRead(id) {
+async function firestoreMarkNotificationRead(id) {
   return updateDocument("notifications", id, { read: true });
 }
 
-async function deleteNotification(id) {
+async function firestoreDeleteNotification(id) {
   return deleteDocument("notifications", id);
 }
 
@@ -1084,9 +1084,9 @@ window.sendPasswordReset = sendPasswordReset;
 window.initializeFirestoreData = initializeFirestoreData;
 window.migrateFromLocalStorage = migrateFromLocalStorage;
 window.getNotifications = getNotifications;
-window.addNotification = addNotification;
-window.markNotificationRead = markNotificationRead;
-window.deleteNotification = deleteNotification;
+window.firestoreAddNotification = firestoreAddNotification;
+window.firestoreMarkNotificationRead = firestoreMarkNotificationRead;
+window.firestoreDeleteNotification = firestoreDeleteNotification;
 window.addChatMessage = addChatMessage;
 
 console.log("[FIREBASE] Multi-tenant firebase.js loaded");
