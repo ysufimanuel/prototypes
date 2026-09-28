@@ -1689,7 +1689,7 @@ function renderActivityList() {
 function renderUpcomingEvents() {
   const data = getData();
   const container = document.getElementById("upcoming-events");
-  const upcoming = data.events
+  const upcoming = (data.events || [])
     .filter((e) => e.status === "upcoming" || e.status === "ongoing")
     .sort((a, b) => new Date(a.start) - new Date(b.start))
     .slice(0, 4);
@@ -1718,7 +1718,7 @@ function renderUpcomingEvents() {
 function renderRecentDonations() {
   const data = getData();
   const container = document.getElementById("recent-donations");
-  const recent = [...data.donations]
+  const recent = [...(data.donations || [])]
     .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal))
     .slice(0, 4);
 
@@ -5257,27 +5257,35 @@ function refreshContacts() {
 function searchContacts(query) {
   const data = getData();
   const container = document.getElementById("contacts-list");
+  if (!container) return;
 
-  const filtered = data.members.filter(
-    (m) =>
-      m.status === "aktif" &&
-      (m.nama.toLowerCase().includes(query.toLowerCase()) ||
-        m.email.toLowerCase().includes(query.toLowerCase())),
-  );
+  const term = String(query || "").toLowerCase().trim();
 
-  container.innerHTML = filtered
-    .map(
-      (m) => `
-        <div class="contact-item" onclick="openChat(${m.id})">
-            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(m.nama)}&background=ff6b00&color=fff&size=40" alt="">
-            <div class="contact-info">
-                <h4>${m.nama}</h4>
-                <p>${m.email}</p>
-            </div>
+  // Chat memakai Firebase Auth UID, bukan ID member numerik.
+  const filtered = (data.users || []).filter((u) => {
+    if (!u.uid || u.uid === currentUser?.uid) return false;
+    const nama = String(u.nama || u.name || u.username || "").toLowerCase();
+    const email = String(u.email || "").toLowerCase();
+    return !term || nama.includes(term) || email.includes(term);
+  });
+
+  container.innerHTML =
+    filtered.map((u) => {
+      const uid = u.uid;
+      const nama = u.nama || u.name || u.username || "User";
+      return `
+        <div class="contact-item" onclick="openChat('${uid}')">
+          <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(nama)}&background=ff6b00&color=fff&size=40" alt="">
+          <div class="contact-info">
+            <h4>${nama}</h4>
+            <p>${u.email || ""}</p>
+          </div>
         </div>
-    `,
-    )
-    .join("");
+      `;
+    }).join("") ||
+    `<p class="text-center" style="padding:20px;color:var(--text-muted);">
+      ${getLang("no-data") || "Tidak ada user"}
+    </p>`;
 }
 
 // ========================================
@@ -7700,7 +7708,7 @@ function editKategori(id) {
 }
 
 // Save Functions
-function savePemasukan() {
+async function savePemasukan() {
   // Check permission - only admin and superadmin can edit
   if (isViewOnly()) {
     showToast(
@@ -7780,7 +7788,11 @@ function savePemasukan() {
     });
   }
 
-  saveData(data);
+  const saved = await saveData(data);
+  if (!saved) {
+    showToast("Gagal menyimpan pemasukan ke Firestore", "error");
+    return;
+  }
   closeModal("modal-pemasukan");
   renderPemasukan();
   updateFinanceSummary();
@@ -8096,8 +8108,30 @@ async function approveItem(tipe, id) {
 
   data.approvalHistory.push(historyItem);
 
-  saveData(data);
+  const saved = await saveData(data);
+  if (!saved) {
+    showToast(
+      currentLanguage === "id"
+        ? "Approval gagal disimpan ke Firestore"
+        : "Approval failed to save to Firestore",
+      "error",
+    );
+    return;
+  }
+
   await saveApprovalHistory(historyItem);
+
+  // Simpan notif approval agar user yang login belakangan tetap melihatnya.
+  if (window.addNotification) {
+    await window.addNotification({
+      title: "💰 Keuangan Disetujui",
+      message: `${tipe === "pemasukan" ? "Pemasukan" : "Pengeluaran"} sebesar ${formatRupiah(item.jumlah)} telah disetujui.`,
+      type: "finance",
+      userId: null,
+      timestamp: now,
+      read: false,
+    });
+  }
 
   renderApprovalTab();
   renderPemasukan();
