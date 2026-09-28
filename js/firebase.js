@@ -220,11 +220,10 @@ async function addChatMessage(data) {
   try {
     await waitForChurchId();
 
-    const d = {
-      ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    // Chat rules memakai allowlist field yang ketat dan caller
+    // sudah mengirim timestamp/read dari app.js. Jangan menambahkan
+    // createdAt/updatedAt di sini karena itu akan ditolak Rules.
+    const d = { ...data };
 
     // CHAT disimpan di ROOT:
     // /messages/{messageId}
