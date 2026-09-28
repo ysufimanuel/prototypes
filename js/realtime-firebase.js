@@ -288,7 +288,14 @@
       // Tapi ini async dan akan re-fetch; lebih efisien update langsung:
       try {
         // Update variabel internal jika bisa
-        const sorted = [...docs].sort(
+        const currentUid = window.auth?.currentUser?.uid;
+        const visibleDocs = (docs || []).filter(
+          (notification) =>
+            !notification.userId ||
+            !currentUid ||
+            notification.userId === currentUid,
+        );
+        const sorted = [...visibleDocs].sort(
           (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
         );
         // Coba set via setter jika ada, atau fallback ke loadNotifications
