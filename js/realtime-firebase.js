@@ -147,8 +147,8 @@
     });
 
     if (typeof window.onUsersSnapshot === "function") {
-      const unsubUsers = window.onUsersSnapshot((users) => {
-        _handleCollectionUpdate("users", users);
+      const unsubUsers = window.onUsersSnapshot((users, changes) => {
+        _handleCollectionUpdate("users", users, changes);
       });
       _unsubscribers.push(unsubUsers);
     }
@@ -219,12 +219,18 @@
    * Dipanggil setiap kali snapshot berubah.
    * Update dataCache lalu trigger render yang sesuai.
    */
-  function _handleCollectionUpdate(colName, docs) {
+  function _handleCollectionUpdate(colName, docs, changes = []) {
     // Pastikan dataCache ada
     if (!window.dataCache) window.dataCache = {};
 
     const cacheKey = COLLECTION_TO_CACHE_KEY[colName];
     if (!cacheKey) return;
+
+    // Simpan snapshot lama sebelum cache ditimpa. Ini membantu membedakan
+    // perubahan remote dari perubahan yang sudah lebih dulu dipantulkan UI lokal.
+    const previousDocs = Array.isArray(window.dataCache[cacheKey])
+      ? window.dataCache[cacheKey]
+      : [];
 
     if (typeof window.applyRealtimeCollectionUpdate === "function") {
       window.applyRealtimeCollectionUpdate(cacheKey, docs);
@@ -236,6 +242,11 @@
     if (colName === "notifications") {
       _syncNotificationsState(docs);
       return; // renderNotifications sudah dipanggil di dalam _syncNotificationsState
+    }
+
+    // Snapshot pertama tidak dianggap sebagai perubahan.
+    if (previousDocs.length > 0 && Array.isArray(changes) && changes.length > 0) {
+      _notifyRealtimeDataChanges(colName, changes, previousDocs);
     }
 
     if (typeof window.refreshRealtimeUI === "function") {
@@ -381,6 +392,7 @@
           type: "message",
           senderId: senderId,
           messageId: message.id,
+          userId: window.auth?.currentUser?.uid || null,
           timestamp: new Date().toISOString(),
           read: false,
         });
@@ -394,6 +406,78 @@
     }
   }
   const activeChatId = window.getCurrentChatId?.();
+  const REALTIME_CHANGE_LABELS = {
+    members: "data jemaat",
+    families: "data keluarga",
+    groups: "data kelompok",
+    events: "kegiatan",
+    attendance: "absensi",
+    donations: "donasi",
+    donors: "data donor",
+    volunteers: "data relawan",
+    assignments: "penugasan relawan",
+    users: "data pengguna",
+    announcements: "pengumuman",
+    pemasukan: "data pemasukan",
+    pengeluaran: "data pengeluaran",
+    financeCategories: "kategori keuangan",
+    approvalHistory: "riwayat persetujuan",
+    deaths: "data kematian",
+  };
+
+  function _sameDocData(a, b) {
+    if (!a || !b) return false;
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function _notifyRealtimeDataChanges(colName, changes, previousDocs) {
+    const label = REALTIME_CHANGE_LABELS[colName];
+    if (!label) return;
+
+    const previousById = new Map(previousDocs.map((doc) => [String(doc.id), doc]));
+    const meaningful = changes.filter((change) => {
+      if (change.type === "added") return !previousById.has(String(change.doc.id));
+      if (change.type === "removed") return previousById.has(String(change.doc.id));
+      if (change.type === "modified") {
+        return !_sameDocData(previousById.get(String(change.doc.id)), change.doc);
+      }
+      return false;
+    });
+
+    if (!meaningful.length) return;
+
+    const counts = meaningful.reduce(
+      (acc, change) => {
+        acc[change.type] = (acc[change.type] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    const parts = [];
+    if (counts.added) parts.push(`${counts.added} ditambahkan`);
+    if (counts.modified) parts.push(`${counts.modified} diperbarui`);
+    if (counts.removed) parts.push(`${counts.removed} dihapus`);
+
+    const message = `${label.charAt(0).toUpperCase() + label.slice(1)}: ${parts.join(", ")}.`;
+
+    if (typeof window._addLocalNotification === "function") {
+      window._addLocalNotification({
+        title: "🔄 Perubahan Data",
+        message,
+        type: "info",
+        localOnly: true,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      _showToastSafe(message, "info");
+    }
+  }
+
   // =========================================================
   // BIRTHDAY NOTIFICATION
   // =========================================================
