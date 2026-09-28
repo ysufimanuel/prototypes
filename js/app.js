@@ -6487,8 +6487,8 @@ async function addNotification(title, message, type = "info", userId = null) {
   };
 
   try {
-    if (isFirebaseReady() && window.addNotification) {
-      await window.addNotification(notification);
+    if (isFirebaseReady() && window.firestoreAddNotification) {
+      await window.firestoreAddNotification(notification);
     } else {
       // Fallback to localStorage
       notifications.unshift(notification);
@@ -6529,8 +6529,8 @@ async function markNotificationRead(notificationId) {
       return true;
     }
 
-    if (isFirebaseReady() && window.markNotificationRead) {
-      await window.markNotificationRead(notificationId);
+    if (isFirebaseReady() && window.firestoreMarkNotificationRead) {
+      await window.firestoreMarkNotificationRead(notificationId);
     } else {
       // Fallback to localStorage
       const notif = notifications.find(
@@ -6586,8 +6586,8 @@ async function deleteNotification(notificationId) {
       return true;
     }
 
-    if (isFirebaseReady() && window.deleteNotification) {
-      await window.deleteNotification(notificationId);
+    if (isFirebaseReady() && window.firestoreDeleteNotification) {
+      await window.firestoreDeleteNotification(notificationId);
     } else {
       // Fallback to localStorage
       notifications = notifications.filter(
