@@ -445,10 +445,36 @@ service cloud.firestore {
       // Notification
       // =======================================================
 match /notifications/{docId} {
-  allow read: if belongsToChurch(churchId);
-  allow create: if belongsToChurch(churchId);
-  allow update: if belongsToChurch(churchId);
-  allow delete: if isSuperAdmin(churchId);
+  // userId == null => church-wide notification
+  // userId == request.auth.uid => private notification
+  allow read: if belongsToChurch(churchId)
+    && (
+      resource.data.get("userId", null) == null
+      || resource.data.get("userId", null) == request.auth.uid
+    );
+
+  // Private notifications can only target the current user.
+  // Church-wide notifications require an admin-level role.
+  allow create: if belongsToChurch(churchId)
+    && (
+      request.resource.data.get("userId", null) == request.auth.uid
+      || (
+        request.resource.data.get("userId", null) == null
+        && isAdmin(churchId)
+      )
+    );
+
+  // Only the owner of a private notification can update it.
+  allow update: if belongsToChurch(churchId)
+    && resource.data.get("userId", null) == request.auth.uid
+    && request.resource.data.get("userId", null) == resource.data.get("userId", null);
+
+  // Superadmin can delete any notification; users can delete their own.
+  allow delete: if isSuperAdmin(churchId)
+    || (
+      belongsToChurch(churchId)
+      && resource.data.get("userId", null) == request.auth.uid
+    );
 }
       // =======================================================
       // PEMASUKAN
