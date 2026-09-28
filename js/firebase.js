@@ -303,7 +303,12 @@ function onCollectionSnapshot(collectionName, callback) {
   if (!isFirebaseReady()) return () => {};
   try {
     return window.firebaseOnSnapshot(churchCol(collectionName), (snap) => {
-      callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const changes = snap.docChanges().map((change) => ({
+        type: change.type,
+        doc: { id: change.doc.id, ...change.doc.data() },
+      }));
+      callback(docs, changes);
     });
   } catch (e) {
     console.error(`[FIREBASE] onCollectionSnapshot(${collectionName}):`, e);
@@ -319,7 +324,12 @@ function onUsersSnapshot(callback) {
       window.firebaseWhere("churchId", "==", _activeChurchId),
     );
     return window.firebaseOnSnapshot(usersQuery, (snap) => {
-      callback(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const changes = snap.docChanges().map((change) => ({
+        type: change.type,
+        doc: { id: change.doc.id, ...change.doc.data() },
+      }));
+      callback(docs, changes);
     });
   } catch (error) {
     console.error("[FIREBASE] onUsersSnapshot:", error);
@@ -744,7 +754,13 @@ async function getNotifications(userId = null) {
     const notifs = userId
       ? await queryDocuments("notifications", "userId", "==", userId)
       : await getAllDocuments("notifications");
-    return notifs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Chat notifications are private to the recipient.
+    // Church-wide notifications keep working when userId is absent.
+    const currentUid = window.auth?.currentUser?.uid || userId;
+    return notifs
+      .filter((n) => !n.userId || !currentUid || n.userId === currentUid)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   } catch (e) {
     return [];
   }
