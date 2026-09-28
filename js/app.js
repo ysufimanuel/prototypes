@@ -6466,9 +6466,13 @@ async function markNotificationRead(notificationId) {
     const localNotif = notifications.find(
       (n) => (n.id || n.timestamp) === notificationId && n.localOnly,
     );
+    const sharedNotif = notifications.find(
+      (n) => (n.id || n.timestamp) === notificationId && !n.userId,
+    );
 
-    if (localNotif) {
-      localNotif.read = true;
+    if (localNotif || sharedNotif) {
+      const target = localNotif || sharedNotif;
+      target.read = true;
       unreadCount = notifications.filter((n) => !n.read).length;
       updateNotificationBadge();
       renderNotifications();
