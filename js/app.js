@@ -8191,16 +8191,13 @@ async function approveItem(tipe, id) {
   await saveApprovalHistory(historyItem);
 
   // Simpan notif approval agar user yang login belakangan tetap melihatnya.
-  if (window.addNotification) {
-    await window.addNotification({
-      title: "💰 Keuangan Disetujui",
-      message: `${tipe === "pemasukan" ? "Pemasukan" : "Pengeluaran"} sebesar ${formatRupiah(item.jumlah)} telah disetujui.`,
-      type: "finance",
-      userId: null,
-      timestamp: now,
-      read: false,
-    });
-  }
+  // Gunakan wrapper app.js dengan signature (title, message, type, userId).
+  await addNotification(
+    "💰 Keuangan Disetujui",
+    `${tipe === "pemasukan" ? "Pemasukan" : "Pengeluaran"} sebesar ${formatRupiah(item.jumlah)} telah disetujui.`,
+    "finance",
+    null,
+  );
 
   renderApprovalTab();
   renderPemasukan();
@@ -8284,7 +8281,14 @@ async function rejectItem(tipe, id) {
 
   data.approvalHistory.push(historyItem);
 
-  saveData(data);
+  const saved = await saveData(data);
+  if (!saved) {
+    showToast(
+      currentLanguage === "id" ? "Penolakan gagal disimpan ke Firestore" : "Rejection failed to save to Firestore",
+      "error",
+    );
+    return;
+  }
   await saveApprovalHistory(historyItem);
 
   renderApprovalTab();
