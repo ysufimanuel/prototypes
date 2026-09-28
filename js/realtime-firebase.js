@@ -92,6 +92,7 @@
   let _birthdayCheckDate = null; // tanggal terakhir dicek
   let _chatNotificationUnsubscribe = null;
   let _chatNotificationInitialized = false;
+  const _initializedCollections = new Set();
   // =========================================================
   // UTIL — tunggu sampai kondisi terpenuhi
   // =========================================================
@@ -137,8 +138,8 @@
 
     REALTIME_COLLECTIONS.forEach((colName) => {
       try {
-        const unsub = window.onCollectionSnapshot(colName, (docs) => {
-          _handleCollectionUpdate(colName, docs);
+        const unsub = window.onCollectionSnapshot(colName, (docs, changes) => {
+          _handleCollectionUpdate(colName, docs, changes);
         });
         _unsubscribers.push(unsub);
       } catch (err) {
@@ -168,6 +169,7 @@
       } catch (_) {}
     });
     _unsubscribers = [];
+    _initializedCollections.clear();
 
     if (_chatNotificationUnsubscribe) {
       try {
@@ -244,10 +246,13 @@
       return; // renderNotifications sudah dipanggil di dalam _syncNotificationsState
     }
 
-    // Snapshot pertama tidak dianggap sebagai perubahan.
-    if (previousDocs.length > 0 && Array.isArray(changes) && changes.length > 0) {
+    // Snapshot pertama hanya membentuk baseline; perubahan berikutnya
+    // dianggap sebagai notifikasi realtime.
+    const isFirstSnapshot = !_initializedCollections.has(colName);
+    if (!isFirstSnapshot && Array.isArray(changes) && changes.length > 0) {
       _notifyRealtimeDataChanges(colName, changes, previousDocs);
     }
+    _initializedCollections.add(colName);
 
     if (typeof window.refreshRealtimeUI === "function") {
       window.refreshRealtimeUI(colName);
