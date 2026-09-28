@@ -721,6 +721,10 @@ function initData() {
 // ========================================
 
 let dataCache = null;
+// Snapshot terakhir yang diketahui sudah tersinkron ke Firestore.
+// Dipisahkan dari dataCache karena banyak handler lama memodifikasi
+// object dataCache langsung sebelum memanggil saveData().
+let lastSyncedData = null;
 let dataListeners = [];
 
 // Initialize data cache from Firestore
@@ -760,6 +764,7 @@ async function initDataCache() {
     dataCache = await loadAllDataFromFirestore();
 
     if (dataCache) {
+      lastSyncedData = JSON.parse(JSON.stringify(dataCache));
       console.log("[APP] Data loaded successfully from Firestore");
       showToast("Terhubung ke database", "success");
     } else {
@@ -915,8 +920,8 @@ async function saveData(data) {
   // Simpan snapshot lama sebelum cache diganti supaya sinkronisasi
   // bisa mendeteksi dokumen yang benar-benar dihapus.
   const previousData =
-    dataCache && typeof dataCache === "object"
-      ? JSON.parse(JSON.stringify(dataCache))
+    lastSyncedData && typeof lastSyncedData === "object"
+      ? JSON.parse(JSON.stringify(lastSyncedData))
       : null;
 
   dataCache = data;
@@ -1022,6 +1027,7 @@ async function syncDataToFirestore(data, previousData = null) {
     if (operationCount > 0) {
       await batch.commit();
     }
+    lastSyncedData = JSON.parse(JSON.stringify(data));
     console.log("[APP] Data berhasil disinkronkan ke Firestore");
     return true;
   } catch (e) {
@@ -6903,6 +6909,15 @@ function applyRealtimeCollectionUpdate(collectionName, docs) {
   });
 
   dataCache[collectionName] = Array.isArray(docs) ? docs : [];
+
+  // Realtime snapshot menjadi baseline sinkronisasi terbaru.
+  if (!lastSyncedData || typeof lastSyncedData !== "object") {
+    lastSyncedData = {};
+  }
+  lastSyncedData[collectionName] = Array.isArray(docs)
+    ? JSON.parse(JSON.stringify(docs))
+    : [];
+
   window.dataCache = dataCache;
 }
 
