@@ -996,7 +996,7 @@ body {
     transition: var(--transition);
 }
 
-9.event-item:hover {
+.event-item:hover {
     background: var(--dark-bg);
 }
 
@@ -4186,4 +4186,276 @@ body {
     font-size: 14px;
     text-align: center;
     margin-top: 20px;
+}
+
+/* ==========================================================================
+   MOBILE COMPACT OVERRIDE  (<= 768px)
+   Ditaruh paling bawah supaya menang dari media query lama di atas.
+   Desktop tidak terpengaruh.
+   ========================================================================== */
+@media (max-width: 768px) {
+
+    :root {
+        --header-height: 54px;
+        --radius: 12px;
+        --radius-sm: 8px;
+    }
+
+    body { font-size: 14px; line-height: 1.5; }
+
+    /* Matikan efek hover "naik" di layar sentuh & animasi berat */
+    .stat-card:hover,
+    .family-card:hover, .group-card:hover, .event-card:hover,
+    .volunteer-card:hover, .user-card:hover,
+    .btn-primary:hover, .btn-danger:hover, .btn-login:hover,
+    #death-list .card:hover, #death-form-container .btn-success:hover {
+        transform: none;
+    }
+    .login-container::before,
+    .login-logo { animation: none; }
+
+    /* ---------- LOGIN & REGISTER ---------- */
+    .login-container {
+        min-height: 100dvh;
+        padding: 14px;
+        padding-top: max(14px, env(safe-area-inset-top));
+        padding-bottom: max(14px, env(safe-area-inset-bottom));
+    }
+    .login-box { padding: 22px 18px; border-radius: 14px; }
+    .login-header { margin-bottom: 18px; }
+    .login-logo { width: 60px; height: 60px; font-size: 26px; margin-bottom: 12px; box-shadow: 0 6px 20px rgba(255,107,0,.35); }
+    .login-header h2 { font-size: 20px; margin-bottom: 2px; }
+    .login-header p { font-size: 13px; }
+    .login-form .form-group { margin-bottom: 12px; }
+    .login-form label { margin-bottom: 5px; font-size: 12.5px; }
+    .login-form input { padding: 11px 14px; font-size: 16px; }
+    .form-options { margin-bottom: 14px; font-size: 12.5px; }
+    .btn-login { padding: 12px; font-size: 15px; }
+    .login-footer { margin-top: 14px; }
+    .login-notification { margin-top: 12px; padding: 10px; font-size: 13px; }
+    #login-page .language-selector { margin-top: 10px !important; }
+    #register-page .login-box { max-width: 100% !important; }
+
+    /* ---------- HEADER ATAS ---------- */
+    .top-header {
+        height: calc(var(--header-height) + env(safe-area-inset-top));
+        padding: env(safe-area-inset-top) 12px 0;
+    }
+    .menu-toggle { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; font-size: 18px; }
+    .header-center { display: none; }
+    .header-right { gap: 10px; margin-left: auto; }
+    .notif-btn { width: 36px; height: 36px; font-size: 15px; }
+    .notif-badge { width: 17px; height: 17px; font-size: 10px; top: -4px; right: -4px; }
+    .user-details { display: none; }
+    .user-avatar { width: 34px; height: 34px; border-width: 2px; }
+
+    /* Dropdown notifikasi: selebar layar di bawah header */
+    .notifications { position: static; }
+    .notif-dropdown {
+        position: fixed;
+        top: calc(var(--header-height) + env(safe-area-inset-top) + 6px);
+        left: 10px; right: 10px;
+        width: auto;
+        max-height: 70dvh;
+    }
+    .notif-header { padding: 10px 14px; }
+    .notif-item { padding: 10px 14px; gap: 10px; }
+    .notif-icon { width: 34px; height: 34px; }
+
+    /* ---------- SIDEBAR (drawer) ---------- */
+    .sidebar {
+        width: min(80vw, 280px);
+        height: 100dvh;
+        padding-top: env(safe-area-inset-top);
+    }
+    .sidebar.active { box-shadow: 0 0 0 100vmax rgba(0,0,0,.6); } /* dim latar */
+    .sidebar-header { padding: 14px 14px; gap: 10px; }
+    .sidebar-logo { width: 38px; height: 38px; font-size: 18px; }
+    .sidebar-title h3 { font-size: 15px; line-height: 1.2; }
+    .sidebar-title span { font-size: 11px; display: block; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sidebar-close { font-size: 18px; padding: 6px; }
+    .sidebar-nav { padding: 8px 0; }
+    .sidebar-nav li { margin: 2px 8px; }
+    .sidebar-nav li a { padding: 10px 12px; gap: 12px; font-size: 13.5px; }
+    .sidebar-nav li a i { width: 20px; font-size: 15px; }
+    .sidebar-footer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .btn-logout { padding: 10px; font-size: 13px; }
+
+    /* ---------- AREA KONTEN ---------- */
+    .content-area {
+        padding: 12px;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+    .page-header { margin-bottom: 12px; }
+    .page-header h1 { font-size: 18px; gap: 8px; margin-bottom: 2px; }
+    .page-header p { font-size: 12.5px; }
+
+    /* ---------- KARTU STATISTIK: 2 kolom, ringkas ---------- */
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat-card {
+        padding: 12px;
+        gap: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        min-width: 0;
+    }
+    .stat-icon { width: 34px; height: 34px; font-size: 15px; border-radius: 9px; }
+    .stat-info { min-width: 0; width: 100%; }
+    .stat-info h3 { font-size: 18px; line-height: 1.2; margin-bottom: 2px; overflow-wrap: anywhere; }
+    .stat-info p { font-size: 11.5px; line-height: 1.3; margin-bottom: 0; }
+    .stat-change { display: none; }   /* persentase di dashboard cuma hiasan; sembunyikan di HP */
+
+    /* ---------- KARTU DASHBOARD ---------- */
+    .dashboard-grid { gap: 10px; }
+    .card-header { padding: 11px 14px; gap: 10px; }
+    .card-header h3 { font-size: 14px; gap: 8px; }
+    .card-header select { padding: 6px 10px; font-size: 12.5px; }
+    .btn-text { font-size: 12.5px; }
+    .chart-container { padding: 12px; height: 220px; }
+    .chart-container.small { height: 180px; }
+    .activity-list, .event-list { padding: 6px; max-height: 300px; }
+    .activity-item, .event-item { padding: 9px 8px; gap: 10px; }
+    .activity-icon { width: 34px; height: 34px; }
+    .activity-content p { font-size: 13px; margin-bottom: 1px; }
+    .activity-content span { font-size: 11px; }
+
+    /* ---------- ACTION BAR, PENCARIAN, FILTER ---------- */
+    .action-bar { gap: 8px; margin-bottom: 12px; flex-direction: column; align-items: stretch; }
+    .search-box { max-width: 100%; width: 100%; }
+    .search-box i { left: 13px; font-size: 13px; }
+    .search-box input { padding: 10px 12px 10px 36px; font-size: 16px; }
+    .filter-group { flex-direction: row; flex-wrap: wrap; gap: 8px; width: 100%; }
+    .filter-group select, .filter-group input { flex: 1 1 calc(50% - 4px); min-width: 0; width: auto; padding: 9px 10px; font-size: 13px; }
+    .action-buttons { display: flex; gap: 8px; width: 100%; justify-content: stretch; }
+    .action-buttons > .btn, .action-buttons > .export-dropdown { flex: 1; }
+    .action-buttons .export-dropdown .btn { width: 100%; justify-content: center; }
+    .export-menu { left: 0; right: auto; min-width: 140px; }
+    .export-menu button { padding: 10px 14px; font-size: 13px; }
+
+    /* ---------- TOMBOL ---------- */
+    .btn { padding: 9px 14px; font-size: 13px; gap: 6px; justify-content: center; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .btn-icon { width: 32px; height: 32px; }
+
+    /* ---------- TAB: satu baris, geser ke samping ---------- */
+    .attendance-tabs, .volunteers-tabs, .communication-tabs, .finance-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 6px;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .attendance-tabs::-webkit-scrollbar, .volunteers-tabs::-webkit-scrollbar,
+    .communication-tabs::-webkit-scrollbar, .finance-tabs::-webkit-scrollbar { display: none; }
+    .tab-btn, .finance-tab {
+        flex: 0 0 auto;
+        min-width: 0;
+        white-space: nowrap;
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+
+    /* ---------- TABEL: padat, geser horizontal ---------- */
+    .table-responsive { -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
+    .data-table th, .data-table td { padding: 9px 10px; font-size: 12.5px; white-space: nowrap; }
+    .data-table th { font-size: 10.5px; letter-spacing: .3px; }
+    .data-table td { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .data-table td:has(.table-actions) { overflow: visible; }
+    .table-avatar { width: 30px; height: 30px; }
+    .table-actions { gap: 6px; }
+    .btn-action { width: 30px; height: 30px; font-size: 12px; }
+    .data-table .badge { padding: 3px 8px; font-size: 10.5px; }
+
+    /* ---------- KARTU (keluarga, grup, event, relawan, user) ---------- */
+    .families-grid, .groups-grid, .events-grid, .volunteers-grid, .users-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .family-card, .group-card, .event-card, .volunteer-card, .user-card { padding: 14px; }
+    .event-card { padding-top: 44px; }
+    .event-card .card-info { gap: 6px; }
+    .event-card .info-row { font-size: 12.5px; }
+    .card-footer-actions { gap: 8px; }
+    .card-footer-actions .btn { flex: 1; }
+
+    /* ---------- RINGKASAN, LAPORAN, PERSETUJUAN ---------- */
+    .summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .summary-card { padding: 12px; }
+    .summary-card h4 { font-size: 12px; }
+    .summary-card p { font-size: 16px; overflow-wrap: anywhere; }
+    .reports-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .report-card { padding: 16px 10px; }
+    .report-card h3 { font-size: 14px; }
+    .report-card p { font-size: 12px; }
+    .report-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .approval-item { padding: 12px; gap: 10px; }
+    .approval-list { gap: 10px; }
+    .form-section { padding: 12px; }
+
+    /* ---------- MODAL: bottom sheet ---------- */
+    .modal { padding: 0; align-items: flex-end; backdrop-filter: blur(4px); }
+    .modal-content,
+    .modal-content.modal-large,
+    .modal-content.modal-small {
+        max-width: 100%;
+        width: 100%;
+        margin: 0;
+        max-height: 92dvh;
+        border-radius: 16px 16px 0 0;
+        border-bottom: none;
+        animation: sheetUp .28s ease-out;
+    }
+    @keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header { padding: 12px 16px; position: sticky; top: 0; background: var(--card-bg); z-index: 2; }
+    .modal-header h3 { font-size: 15px; }
+    .modal-close { width: 32px; height: 32px; font-size: 22px; }
+    .modal-body { padding: 14px 16px; }
+    .modal-footer {
+        padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+        position: sticky; bottom: 0; background: var(--card-bg); z-index: 2;
+        gap: 8px;
+    }
+    .modal-footer .btn { flex: 1; }
+
+    /* ---------- FORM ---------- */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { margin-bottom: 5px; font-size: 12.5px; }
+    .form-row { grid-template-columns: 1fr; gap: 0; }
+    .form-group input, .form-group select, .form-group textarea,
+    .form-control, #death-form-container input, #death-form-container textarea {
+        padding: 10px 12px;
+        font-size: 16px;            /* 16px mencegah iOS zoom otomatis saat fokus */
+    }
+    .form-group textarea { min-height: 70px; }
+
+    /* ---------- DATA KEMATIAN ---------- */
+    #death-form-container { padding: 14px; }
+    #death-form-container input, #death-form-container textarea { margin-bottom: 8px; }
+    #death-form-container .btn-success { width: 100%; padding: 11px; }
+    #death-list .card { padding: 12px; margin-bottom: 8px; }
+
+    /* ---------- TOAST: penuh di atas ---------- */
+    .toast {
+        top: calc(10px + env(safe-area-inset-top));
+        left: 10px; right: 10px;
+        padding: 11px 14px;
+        gap: 10px;
+        transform: translateY(-180%);
+    }
+    .toast.show { transform: translateY(0); }
+    .toast i { font-size: 18px; }
+}
+
+/* ---------- HP kecil (<= 380px) ---------- */
+@media (max-width: 380px) {
+    .stat-info h3 { font-size: 16px; }
+    .reports-grid { grid-template-columns: 1fr; }
+    .filter-group select, .filter-group input { flex-basis: 100%; }
+    .btn { padding: 9px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
 }
