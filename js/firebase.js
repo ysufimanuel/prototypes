@@ -535,7 +535,7 @@ async function createChurchUser(userData) {
     const token = await auth.currentUser.getIdToken();
 
     const response = await fetch(
-      "http://localhost:3000/api/admin/create-user",
+      "/api/admin/create-user",
       {
         method: "POST",
         headers: {
@@ -583,7 +583,7 @@ async function updateChurchUser(uid, userData) {
     const token = await auth.currentUser.getIdToken();
 
     const response = await fetch(
-      `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
+      `/api/admin/users/${encodeURIComponent(uid)}`,
       {
         method: "PATCH",
         headers: {
@@ -630,7 +630,7 @@ async function deleteChurchUser(uid) {
     const token = await auth.currentUser.getIdToken();
 
     const response = await fetch(
-      `http://127.0.0.1:3000/api/admin/users/${encodeURIComponent(uid)}`,
+      `/api/admin/users/${encodeURIComponent(uid)}`,
       {
         method: "DELETE",
         headers: {
