@@ -6375,6 +6375,30 @@ window._setNotificationsState = function (sorted) {
   renderNotifications();
 };
 
+// Add a notification that exists only in the current app session.
+// Used for realtime data changes detected by Firestore listeners.
+// It intentionally does not write another Firestore document.
+window._addLocalNotification = function (notification) {
+  const localNotification = {
+    ...notification,
+    id: notification.id || `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    localOnly: true,
+    read: false,
+    timestamp: notification.timestamp || new Date().toISOString(),
+  };
+
+  notifications = [localNotification, ...notifications].slice(0, 30);
+  unreadCount = notifications.filter((n) => !n.read).length;
+  updateNotificationBadge();
+  renderNotifications();
+
+  if (typeof showToast === "function") {
+    showToast(localNotification.message, localNotification.type || "info");
+  }
+
+  return localNotification;
+};
+
 // Load notifications from Firebase
 async function loadNotifications() {
   console.log("[APP] loadNotifications START");
@@ -6439,6 +6463,18 @@ async function markNotificationRead(notificationId) {
   console.log("[APP] markNotificationRead:", notificationId);
 
   try {
+    const localNotif = notifications.find(
+      (n) => (n.id || n.timestamp) === notificationId && n.localOnly,
+    );
+
+    if (localNotif) {
+      localNotif.read = true;
+      unreadCount = notifications.filter((n) => !n.read).length;
+      updateNotificationBadge();
+      renderNotifications();
+      return true;
+    }
+
     if (isFirebaseReady() && window.markNotificationRead) {
       await window.markNotificationRead(notificationId);
     } else {
@@ -6482,6 +6518,20 @@ async function deleteNotification(notificationId) {
   console.log("[APP] deleteNotification:", notificationId);
 
   try {
+    const localNotif = notifications.find(
+      (n) => (n.id || n.timestamp) === notificationId && n.localOnly,
+    );
+
+    if (localNotif) {
+      notifications = notifications.filter(
+        (n) => (n.id || n.timestamp) !== notificationId,
+      );
+      unreadCount = notifications.filter((n) => !n.read).length;
+      updateNotificationBadge();
+      renderNotifications();
+      return true;
+    }
+
     if (isFirebaseReady() && window.deleteNotification) {
       await window.deleteNotification(notificationId);
     } else {
