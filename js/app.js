@@ -912,10 +912,17 @@ function initDataLocal() {
 
 // Save data to Firestore or localStorage
 async function saveData(data) {
+  // Simpan snapshot lama sebelum cache diganti supaya sinkronisasi
+  // bisa mendeteksi dokumen yang benar-benar dihapus.
+  const previousData =
+    dataCache && typeof dataCache === "object"
+      ? JSON.parse(JSON.stringify(dataCache))
+      : null;
+
   dataCache = data;
 
   if (isFirebaseReady()) {
-    return await syncDataToFirestore(data);
+    return await syncDataToFirestore(data, previousData);
   }
 
   // Fallback to localStorage
@@ -932,8 +939,8 @@ async function saveData(data) {
   }
 }
 
-async function syncDataToFirestore(data) {
-  if (!isFirebaseReady() || !window.getActiveChurchId()) return;
+async function syncDataToFirestore(data, previousData = null) {
+  if (!isFirebaseReady() || !window.getActiveChurchId()) return false;
 
   // Cache lama bisa berisi object/null; batch Firestore hanya menerima daftar item.
   const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -956,9 +963,33 @@ async function syncDataToFirestore(data) {
   };
 
   const batch = window.firebaseWriteBatch(window.db);
+  let operationCount = 0;
 
   for (const [collectionName, items] of Object.entries(collections)) {
+    const currentIds = new Set(items.map((item) => String(item.id)));
+    const previousItems = asArray(previousData?.[collectionName]);
+
+    // IMPORTANT: batch.set() saja tidak pernah menghapus dokumen Firestore.
+    // Bandingkan snapshot lama vs data baru agar delete dari UI ikut
+    // menghapus dokumen di Firestore dan memicu docChanges() = "removed".
+    for (const oldItem of previousItems) {
+      const oldId = String(oldItem.id);
+      if (!currentIds.has(oldId)) {
+        const ref = window.firebaseDoc(
+          window.db,
+          "churches",
+          window.getActiveChurchId(),
+          collectionName,
+          oldId,
+        );
+        batch.delete(ref);
+        operationCount++;
+      }
+    }
+
     for (const item of items) {
+      if (item == null || item.id === undefined || item.id === null) continue;
+
       const ref = window.firebaseDoc(
         window.db,
         "churches",
@@ -967,6 +998,7 @@ async function syncDataToFirestore(data) {
         String(item.id),
       );
       batch.set(ref, item, { merge: true });
+      operationCount++;
     }
   }
 
@@ -983,10 +1015,13 @@ async function syncDataToFirestore(data) {
       "config",
     );
     batch.set(configRef, data.finance, { merge: true });
+    operationCount++;
   }
 
   try {
-    await batch.commit();
+    if (operationCount > 0) {
+      await batch.commit();
+    }
     console.log("[APP] Data berhasil disinkronkan ke Firestore");
     return true;
   } catch (e) {
@@ -1725,7 +1760,7 @@ function renderRecentDonations() {
 
   container.innerHTML = recent
     .map((d) => {
-      const donor = data.members.find((m) => m.id === d.donorId);
+      const donor = (data.members || []).find((m) => m.id === d.donorId);
       return `
             <div class="donation-item">
                 <div class="donor-info">
@@ -3364,11 +3399,17 @@ function renderMembersTable() {
   const statusFilter = document.getElementById("filter-status")?.value || "";
   const genderFilter = document.getElementById("filter-gender")?.value || "";
 
-  let filtered = data.members.filter((m) => {
+  const members = Array.isArray(data.members) ? data.members : [];
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+
+  let filtered = members.filter((m) => {
+    const nama = String(m.nama || "");
+    const email = String(m.email || "");
+    const telepon = String(m.telepon || "");
     const matchSearch =
-      m.nama.toLowerCase().includes(searchTerm) ||
-      m.email.toLowerCase().includes(searchTerm) ||
-      m.telepon.includes(searchTerm);
+      nama.toLowerCase().includes(searchTerm) ||
+      email.toLowerCase().includes(searchTerm) ||
+      telepon.includes(searchTerm);
     const matchStatus = !statusFilter || m.status === statusFilter;
     const matchGender = !genderFilter || m.jk === genderFilter;
     return matchSearch && matchStatus && matchGender;
@@ -3379,7 +3420,7 @@ function renderMembersTable() {
   container.innerHTML =
     filtered
       .map((m) => {
-        const group = data.groups.find((g) => g.id == m.groupId);
+        const group = groups.find((g) => g.id == m.groupId);
 
         // For view-only users, hide sensitive info
         const emailDisplay = isUser ? "***@***.com" : m.email;
@@ -6833,7 +6874,34 @@ function initFinance() {
 // Dipanggil oleh listener Firestore agar cache aplikasi dan UI memakai data
 // snapshot terbaru, tanpa memerlukan refresh halaman.
 function applyRealtimeCollectionUpdate(collectionName, docs) {
-  if (!dataCache) dataCache = {};
+  if (!dataCache || typeof dataCache !== "object") dataCache = {};
+
+  const realtimeArrayKeys = [
+    "members",
+    "families",
+    "groups",
+    "events",
+    "attendance",
+    "donations",
+    "donors",
+    "volunteers",
+    "assignments",
+    "users",
+    "announcements",
+    "pemasukan",
+    "pengeluaran",
+    "financeCategories",
+    "approvalHistory",
+    "deaths",
+    "notifications",
+  ];
+
+  // Listener Firestore datang satu per satu. Jangan biarkan renderer
+  // membaca undefined hanya karena koleksi lain belum selesai snapshot.
+  realtimeArrayKeys.forEach((key) => {
+    if (!Array.isArray(dataCache[key])) dataCache[key] = [];
+  });
+
   dataCache[collectionName] = Array.isArray(docs) ? docs : [];
   window.dataCache = dataCache;
 }
