@@ -6425,7 +6425,19 @@ let unreadCount = 0;
 // Helper untuk real-time patch layer (realtime-firebase.js)
 // Memperbarui state notifikasi tanpa re-fetch ke Firebase
 window._setNotificationsState = function (sorted) {
-  notifications = sorted || [];
+  const previousLocal = notifications.filter((n) => n.localOnly);
+  const incoming = Array.isArray(sorted) ? sorted : [];
+  const incomingIds = new Set(incoming.map((n) => String(n.id || n.timestamp)));
+
+  // Jangan buang notifikasi lokal realtime hanya karena snapshot
+  // Firestore melakukan re-render state.
+  const preservedLocal = previousLocal.filter(
+    (n) => !incomingIds.has(String(n.id || n.timestamp)),
+  );
+
+  notifications = [...preservedLocal, ...incoming].sort(
+    (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+  );
   unreadCount = notifications.filter((n) => !n.read).length;
   updateNotificationBadge();
   renderNotifications();
@@ -6461,7 +6473,19 @@ async function loadNotifications() {
 
   try {
     if (isFirebaseReady() && window.getNotifications) {
-      notifications = await window.getNotifications();
+      const previousLocal = notifications.filter((n) => n.localOnly);
+      const remoteNotifications = await window.getNotifications();
+      const remoteIds = new Set(
+        remoteNotifications.map((n) => String(n.id || n.timestamp)),
+      );
+
+      notifications = [
+        ...previousLocal.filter(
+          (n) => !remoteIds.has(String(n.id || n.timestamp)),
+        ),
+        ...remoteNotifications,
+      ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
       unreadCount = notifications.filter((n) => !n.read).length;
       updateNotificationBadge();
       renderNotifications();
@@ -6526,29 +6550,34 @@ async function markNotificationRead(notificationId) {
       (n) => (n.id || n.timestamp) === notificationId && !n.userId,
     );
 
-    if (localNotif || sharedNotif) {
-      const target = localNotif || sharedNotif;
-      target.read = true;
-      unreadCount = notifications.filter((n) => !n.read).length;
-      updateNotificationBadge();
-      renderNotifications();
+    const target = notifications.find(
+      (n) => (n.id || n.timestamp) === notificationId,
+    );
+
+    if (!target) return false;
+
+    // Tandai di UI dulu supaya notifikasi tidak "menghilang" akibat
+    // fetch/snapshot ulang tepat setelah user membukanya.
+    target.read = true;
+    unreadCount = notifications.filter((n) => !n.read).length;
+    updateNotificationBadge();
+    renderNotifications();
+
+    if (target.localOnly || !target.userId) {
+      // local-only dan church-wide tidak punya status read per-user
+      // yang bisa disimpan dengan Rules saat ini.
       return true;
     }
 
     if (isFirebaseReady() && window.firestoreMarkNotificationRead) {
-      await window.firestoreMarkNotificationRead(notificationId);
-    } else {
-      // Fallback to localStorage
-      const notif = notifications.find(
-        (n) => n.id === notificationId || n.timestamp === notificationId,
-      );
-      if (notif) {
-        notif.read = true;
-        localStorage.setItem("cmsNotifications", JSON.stringify(notifications));
+      const saved = await window.firestoreMarkNotificationRead(notificationId);
+      if (!saved) {
+        console.warn("[APP] Gagal menyimpan status read notification:", notificationId);
       }
+    } else {
+      localStorage.setItem("cmsNotifications", JSON.stringify(notifications));
     }
 
-    await loadNotifications();
     return true;
   } catch (error) {
     console.error("[APP] Error marking notification read:", error);
