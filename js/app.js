@@ -8616,9 +8616,41 @@ function exportLaporan() {
   showToast("Laporan berhasil diexport", "success");
 }
 
+// Make data tables readable as stacked cards on small screens.
+function enhanceMobileTables() {
+  document.querySelectorAll(".data-table").forEach((table) => {
+    const headers = Array.from(table.querySelectorAll("thead th")).map((th) =>
+      th.textContent.trim(),
+    );
+
+    table.querySelectorAll("tbody tr").forEach((row) => {
+      Array.from(row.children).forEach((cell, index) => {
+        if (cell.tagName !== "TD" || cell.colSpan > 1) return;
+        if (!cell.dataset.label && headers[index]) {
+          cell.dataset.label = headers[index];
+        }
+      });
+    });
+  });
+}
+
+function observeMobileTables() {
+  enhanceMobileTables();
+
+  const observer = new MutationObserver(() => {
+    enhanceMobileTables();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", function () {
   // Apply language on load
+  observeMobileTables();
   applyLanguage();
 
   // Add keyboard shortcuts
