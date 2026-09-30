@@ -1498,14 +1498,57 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   }
 
-  // Tombol "Daftar Gereja Baru"
+  // Tombol "Daftar Gereja Baru" + tab autentikasi
+  const switchAuthView = (view) => {
+    const loginPage = document.getElementById("login-page");
+    const registerPage = document.getElementById("register-page");
+    if (!loginPage || !registerPage) return;
+
+    const showRegister = view === "register";
+    const incoming = showRegister ? registerPage : loginPage;
+    const outgoing = showRegister ? loginPage : registerPage;
+
+    if (!outgoing.classList.contains("hidden") && !incoming.classList.contains("hidden")) return;
+
+    document.body.classList.add("auth-transitioning");
+    incoming.classList.remove("hidden");
+    outgoing.classList.remove("hidden");
+    outgoing.classList.add(showRegister ? "auth-slide-out-left" : "auth-slide-out-right");
+    incoming.classList.add(showRegister ? "auth-slide-in-right" : "auth-slide-in-left");
+
+    const setTabs = (activeRegister) => {
+      document.querySelectorAll(".auth-tab").forEach((tab) => {
+        const active = activeRegister
+          ? tab.id.includes("register")
+          : tab.id.includes("login");
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+    };
+    setTabs(showRegister);
+
+    window.setTimeout(() => {
+      outgoing.classList.add("hidden");
+      outgoing.classList.remove("auth-slide-out-left", "auth-slide-out-right");
+      incoming.classList.remove("auth-slide-in-left", "auth-slide-in-right");
+      document.body.classList.remove("auth-transitioning");
+    }, 380);
+  };
+
+  window.switchAuthView = switchAuthView;
+
   const btnRegister = document.getElementById("btn-show-register");
-  if (btnRegister) {
-    btnRegister.addEventListener("click", () => {
-      document.getElementById("login-page").classList.add("hidden");
-      document.getElementById("register-page").classList.remove("hidden");
-    });
-  }
+  if (btnRegister) btnRegister.addEventListener("click", () => switchAuthView("register"));
+
+  const authTabLogin = document.getElementById("auth-tab-login");
+  const authTabRegister = document.getElementById("auth-tab-register");
+  const authTabLoginRegister = document.getElementById("auth-tab-login-register");
+  const authTabRegisterActive = document.getElementById("auth-tab-register-active");
+
+  if (authTabLogin) authTabLogin.addEventListener("click", () => switchAuthView("login"));
+  if (authTabRegister) authTabRegister.addEventListener("click", () => switchAuthView("register"));
+  if (authTabLoginRegister) authTabLoginRegister.addEventListener("click", () => switchAuthView("login"));
+  if (authTabRegisterActive) authTabRegisterActive.addEventListener("click", () => switchAuthView("register"));
 
   // Form registrasi gereja
   const registerForm = document.getElementById("register-form");
@@ -1553,10 +1596,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   // Tombol kembali dari register ke login
   const btnBackToLogin = document.getElementById("btn-back-to-login");
   if (btnBackToLogin) {
-    btnBackToLogin.addEventListener("click", () => {
-      document.getElementById("register-page").classList.add("hidden");
-      document.getElementById("login-page").classList.remove("hidden");
-    });
+    btnBackToLogin.addEventListener("click", () => switchAuthView("login"));
   }
 });
 
@@ -1585,6 +1625,11 @@ function showPage(pageId) {
     `.sidebar-nav li[onclick*="${pageId}"]`,
   );
   if (activeNav) activeNav.classList.add("active");
+
+  // Update mobile bottom navigation
+  document.querySelectorAll(".mobile-bottom-nav [data-mobile-page]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mobilePage === pageId);
+  });
 
   // Close sidebar on mobile
   if (window.innerWidth <= 992) {
