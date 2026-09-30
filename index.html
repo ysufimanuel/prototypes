@@ -23,6 +23,10 @@
                 <h2 data-lang="app-title">Church Management System</h2>
                 <p data-lang="app-subtitle">Sistem Manajemen Gereja Digital</p>
             </div>
+            <div class="auth-tabs" role="tablist" aria-label="Autentikasi">
+                <button type="button" id="auth-tab-login" class="auth-tab active" role="tab" aria-selected="true">Login</button>
+                <button type="button" id="auth-tab-register" class="auth-tab" role="tab" aria-selected="false">Daftar Gereja</button>
+            </div>
             <form id="login-form" class="login-form">
                 <div class="form-group">
                     <label for="username"><i class="fas fa-user"></i> <span data-lang="username">Username</span></label>
@@ -72,6 +76,10 @@
                 <p>Buat akun untuk gereja Anda</p>
             </div>
 
+            <div class="auth-tabs" role="tablist" aria-label="Autentikasi">
+                <button type="button" id="auth-tab-login-register" class="auth-tab" role="tab" aria-selected="false">Login</button>
+                <button type="button" id="auth-tab-register-active" class="auth-tab active" role="tab" aria-selected="true">Daftar Gereja</button>
+            </div>
             <form id="register-form" class="login-form">
 
                 <!-- DATA GEREJA -->
@@ -1291,7 +1299,15 @@
                     <div class="action-bar">
                         <div class="search-box">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="search-users" placeholder="Cari user..." onkeyup="searchUsers()"
+                         
+        
+        <nav class="mobile-bottom-nav" aria-label="Navigasi mobile">
+            <button type="button" data-mobile-page="dashboard" onclick="showPage('dashboard')"><i class="fas fa-home"></i><span>Home</span></button>
+            <button type="button" data-mobile-page="members" onclick="showPage('members')"><i class="fas fa-users"></i><span>Members</span></button>
+            <button type="button" data-mobile-page="attendance" onclick="showPage('attendance')"><i class="fas fa-clipboard-check"></i><span>Absensi</span></button>
+            <button type="button" data-mobile-page="donations" onclick="showPage('donations')"><i class="fas fa-hand-holding-heart"></i><span>Donasi</span></button>
+            <button type="button" data-mobile-page="groups" onclick="showPage('groups')"><i class="fas fa-object-group"></i><span>Groups</span></button>
+        </nav>   <input type="text" id="search-users" placeholder="Cari user..." onkeyup="searchUsers()"
                                 data-lang-placeholder="search-users">
                         </div>
                         <div class="action-buttons">
