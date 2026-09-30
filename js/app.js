@@ -2489,7 +2489,7 @@ function renderEventsGrid() {
     document.getElementById("filter-event-status")?.value || "";
 
   let filtered = data.events.filter((e) => {
-    const matchSearch = e.nama.toLowerCase().includes(searchTerm);
+    const matchSearch = (e.nama || "").toLowerCase().includes(searchTerm);
     const matchStatus = !statusFilter || e.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -2503,7 +2503,6 @@ function renderEventsGrid() {
   container.innerHTML =
     filtered
       .map((e) => {
-        const startDate = new Date(e.start);
         const participantCount = e.participants ? e.participants.length : 0;
         const editButtons = isViewOnly()
           ? ""
@@ -2522,14 +2521,14 @@ function renderEventsGrid() {
                     <div class="card-avatar"><i class="fas fa-calendar-alt"></i></div>
                     <div class="card-title">
                         <h4>${e.nama}</h4>
-                        <p>${eventType}</p>
+                        <p class="event-type-badge"><i class="fas fa-circle"></i> ${eventType}</p>
                     </div>
                 </div>
                 <div class="card-info">
-                    <div class="info-row"><i class="fas fa-calendar"></i> ${formatDate(e.start)}</div>
-                    <div class="info-row"><i class="fas fa-clock"></i> ${formatTime(e.start)} - ${formatTime(e.end)}</div>
-                    <div class="info-row"><i class="fas fa-map-marker-alt"></i> ${e.lokasi}</div>
-                    <div class="info-row"><i class="fas fa-users"></i> ${participantCount} ${currentLanguage === "id" ? "peserta" : "participants"}</div>
+                    <div class="info-row"><i class="fas fa-calendar"></i> <span>${formatDate(e.start)}</span></div>
+                    <div class="info-row"><i class="fas fa-clock"></i> <span>${formatTime(e.start)} - ${formatTime(e.end)}</span></div>
+                    <div class="info-row"><i class="fas fa-map-marker-alt"></i> <span>${e.lokasi || "-"}</span></div>
+                    <div class="info-row"><i class="fas fa-users"></i> <span>${participantCount} ${currentLanguage === "id" ? "peserta" : "participants"}${e.kapasitas ? ` / ${e.kapasitas}` : ""}</span></div>
                 </div>
                 <div class="card-footer-actions">
                     ${editButtons}
@@ -2539,15 +2538,16 @@ function renderEventsGrid() {
         `;
       })
       .join("") ||
-    `<p class="text-center" style="grid-column: 1/-1; color: var(--text-muted);">${getLang("no-data") || "Tidak ada data"}</p>`;
+    `<p class="text-center event-empty-state" style="grid-column: 1/-1;">${getLang("no-data") || "Tidak ada data"}</p>`;
 
-  // Hide add button for view-only users
   const addButton = document.querySelector(
     "#page-events .action-buttons .btn-primary",
   );
   if (addButton) {
     addButton.style.display = isViewOnly() ? "none" : "inline-flex";
   }
+
+  updateEventFilterChips(statusFilter);
 }
 
 function searchEvents() {
@@ -2556,6 +2556,39 @@ function searchEvents() {
 
 function filterEvents() {
   renderEventsGrid();
+}
+
+function toggleEventFilters() {
+  const panel = document.getElementById("event-mobile-filters");
+  const toggle = document.querySelector(".event-filter-toggle");
+  if (!panel) return;
+
+  const isOpen = !panel.hasAttribute("hidden");
+  if (isOpen) {
+    panel.setAttribute("hidden", "");
+  } else {
+    panel.removeAttribute("hidden");
+  }
+
+  if (toggle) toggle.setAttribute("aria-expanded", String(!isOpen));
+}
+
+function setEventStatusFilter(status) {
+  const select = document.getElementById("filter-event-status");
+  if (select) select.value = status;
+
+  renderEventsGrid();
+
+  const panel = document.getElementById("event-mobile-filters");
+  const toggle = document.querySelector(".event-filter-toggle");
+  if (panel) panel.setAttribute("hidden", "");
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+}
+
+function updateEventFilterChips(status) {
+  document.querySelectorAll(".event-filter-chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.eventStatus === status);
+  });
 }
 
 function handleEventTypeChange() {
