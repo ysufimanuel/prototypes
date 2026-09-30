@@ -2559,35 +2559,36 @@ function filterEvents() {
 }
 
 function toggleEventFilters() {
-    // Mencari elemen pembungkus dropdown Semua Status
-    var filterGroup = document.querySelector(".filter-group.event-filter-desktop");
-    var button = document.querySelector(".event-filter-toggle");
-    
-    // Toggle class 'active' untuk memunculkan atau menyembunyikan elemen
-    filterGroup.classList.toggle("active");
-    
-    // Mengubah status aksesibilitas tombol aria-expanded
-    var isExpanded = filterGroup.classList.contains("active");
-    button.setAttribute("aria-expanded", isExpanded);
-}
+  const filterGroup = document.querySelector("#page-events .event-filter-desktop");
+  const button = document.querySelector("#page-events .event-filter-toggle");
+  if (!filterGroup || !button) return;
 
+  const willOpen = !filterGroup.classList.contains("active");
+  filterGroup.classList.toggle("active", willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+
+  if (willOpen) {
+    const select = document.getElementById("filter-event-status");
+    if (select) select.focus();
+  }
+}
 
 function setEventStatusFilter(status) {
   const select = document.getElementById("filter-event-status");
-  if (select) select.value = status;
+  if (select) {
+    select.value = status || "";
+    filterEvents();
+  }
 
-  renderEventsGrid();
-
-  const panel = document.getElementById("event-mobile-filters");
-  const toggle = document.querySelector(".event-filter-toggle");
-  if (panel) panel.setAttribute("hidden", "");
+  const filterGroup = document.querySelector("#page-events .event-filter-desktop");
+  const toggle = document.querySelector("#page-events .event-filter-toggle");
+  if (filterGroup) filterGroup.classList.remove("active");
   if (toggle) toggle.setAttribute("aria-expanded", "false");
 }
 
-function updateEventFilterChips(status) {
-  document.querySelectorAll(".event-filter-chip").forEach((chip) => {
-    chip.classList.toggle("active", chip.dataset.eventStatus === status);
-  });
+function updateEventFilterChips() {
+  // Compatibility hook for older callers. The mobile UI now uses the
+  // single status select opened from the filter button.
 }
 
 function handleEventTypeChange() {
