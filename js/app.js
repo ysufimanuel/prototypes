@@ -2559,19 +2559,18 @@ function filterEvents() {
 }
 
 function toggleEventFilters() {
-  const panel = document.getElementById("event-mobile-filters");
-  const toggle = document.querySelector(".event-filter-toggle");
-  if (!panel) return;
-
-  const isOpen = !panel.hasAttribute("hidden");
-  if (isOpen) {
-    panel.setAttribute("hidden", "");
-  } else {
-    panel.removeAttribute("hidden");
-  }
-
-  if (toggle) toggle.setAttribute("aria-expanded", String(!isOpen));
+    // Mencari elemen pembungkus dropdown Semua Status
+    var filterGroup = document.querySelector(".filter-group.event-filter-desktop");
+    var button = document.querySelector(".event-filter-toggle");
+    
+    // Toggle class 'active' untuk memunculkan atau menyembunyikan elemen
+    filterGroup.classList.toggle("active");
+    
+    // Mengubah status aksesibilitas tombol aria-expanded
+    var isExpanded = filterGroup.classList.contains("active");
+    button.setAttribute("aria-expanded", isExpanded);
 }
+
 
 function setEventStatusFilter(status) {
   const select = document.getElementById("filter-event-status");
@@ -8905,7 +8904,7 @@ window.filterEvents = filterEvents;
 window.searchEvents = searchEvents;
 window.handleEventTypeChange = handleEventTypeChange;
 window.addParticipant = addParticipant;
-
+window.toggleEventFilters = toggleEventFilters;
 window.editEvent = editEvent;
 window.saveEvent = saveEvent;
 window.deleteEvent = deleteEvent;

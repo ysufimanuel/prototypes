@@ -510,17 +510,33 @@ body.auth-transitioning .login-container {
   }
 
   #page-events .action-bar {
-    display: grid;
+    display: flex;
+    position: relative;
+    width: 100%;
     grid-template-columns: minmax(320px, 1fr) 225px auto;
     align-items: center;
     gap: 16px;
     margin-bottom: 28px;
+    flex-direction: column; /* Membuat dropdown otomatis turun ke bawah input */
+    gap: 8px;
   }
 
   #page-events .event-search-box {
+    position: relative;
+    display: flex;
+    align-items: center;
     width: 100%;
     min-height: 52px;
   }
+  .event-search-box > .fa-search {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666666;
+    pointer-events: none; /* Klik bisa menembus ikon langsung ke input text */
+    z-index: 2;
+}
 
   #page-events .event-filter-desktop {
     width: 100%;
@@ -528,6 +544,20 @@ body.auth-transitioning .login-container {
 
   #page-events .event-filter-desktop select {
     width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    appearance: none; /* Menghilangkan panah bawaan jika ingin diganti styling internal */
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://w3.org'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+
     min-height: 52px;
   }
 
@@ -541,7 +571,24 @@ body.auth-transitioning .login-container {
     white-space: nowrap;
   }
 
-  #page-events .event-filter-toggle,
+  #page-events .event-filter-toggle{
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #888888;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 2;
+    transition: color 0.2s;
+  }
+
+  .event-filter-toggle:hover {
+    color: #ffffff;
+  }
+
   #page-events .event-mobile-filters {
     display: none;
   }
@@ -594,7 +641,7 @@ body.auth-transitioning .login-container {
     margin: 0;
     padding: 6px 12px;
     border: 1px solid rgba(255,255,255,.25);
-    border-radius: 999px;
+    border-radius: px;
     background: rgba(255,255,255,.04);
     color: #e8e8eb;
     font-size: 13px;
@@ -706,8 +753,10 @@ body.auth-transitioning .login-container {
     }
 
     #page-events .event-search-box {
+      position: relative;
       display: flex;
       align-items: center;
+      width: 100%;
       min-height: 54px;
       padding-right: 8px;
       border-radius: 18px;
@@ -715,6 +764,12 @@ body.auth-transitioning .login-container {
 
     #page-events .event-search-box input {
       min-width: 0;
+      font-size: 14px; width: 100%;
+      padding: 12px 45px 12px 40px; 
+      background-color: #111111;
+      border: 1px solid #222222;
+      border-radius: 8px;
+      color: #ffffff;
       font-size: 14px;
     }
 

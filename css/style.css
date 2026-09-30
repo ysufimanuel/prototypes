@@ -145,8 +145,10 @@ body {
 }
 
 .login-form label {
-    display: block;
-    margin-bottom: 10px;
+     display: inline-flex;       /* Menggunakan flexbox agar elemen di dalamnya sejajar ke samping */
+    align-items: center;        /* Membuat checkbox dan tulisan pas di tengah secara vertikal */
+    white-space: nowrap;        /* Mencegah tulisan teks turun ke bawah meskipun layar sempit */
+    gap: 8px;     
     font-size: 14px;
     color: var(--text-secondary);
     font-weight: 500;
@@ -996,7 +998,7 @@ body {
     transition: var(--transition);
 }
 
-9.event-item:hover {
+.event-item:hover {
     background: var(--dark-bg);
 }
 
@@ -1489,9 +1491,10 @@ body {
 }
 
 .event-status {
-    position: absolute;
-    top: 12px;
-    left: 12px;
+    position: absolute !important;
+    top: 15px !important;
+    right: 12px !important;
+    left: auto !important;
     padding: 5px 12px;
     border-radius: 15px;
     font-size: 10px;
@@ -2940,7 +2943,7 @@ body {
    CARD STYLES
    ======================================== */
 .event-card, .volunteer-card, .user-card, .family-card, .group-card {
-    position: relative;
+    position: relative !important;
     background: var(--card-bg);
     border-radius: var(--radius);
     padding: 20px;
