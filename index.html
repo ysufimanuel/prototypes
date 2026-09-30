@@ -545,11 +545,11 @@
                             <i class="fas fa-search"></i>
                             <input type="text" id="search-events" placeholder="Cari event..." onkeyup="searchEvents()"
                                 data-lang-placeholder="search-events">
-                            <button type="button" class="event-filter-toggle" onclick="toggleEventFilters()"
-                                aria-label="Filter event" aria-expanded="false">
-                                <i class="fas fa-sliders-h"></i>
-                            </button>
                         </div>
+                        <button type="button" class="event-filter-toggle" onclick="toggleEventFilters()"
+                            aria-label="Filter event" aria-expanded="false">
+                            <i class="fas fa-sliders-h"></i>
+                        </button>
                         <div class="filter-group event-filter-desktop">
                             <select id="filter-event-status" onchange="filterEvents()">
                                 <option value="" data-lang="all-status">Semua Status</option>
@@ -562,12 +562,6 @@
                             <button class="btn btn-primary" onclick="showAddEventModal()">
                                 <i class="fas fa-plus"></i> <span data-lang="add-event">Tambah Event</span>
                             </button>
-                        </div>
-                        <div id="event-mobile-filters" class="event-mobile-filters" hidden>
-                            <button type="button" class="event-filter-chip active" data-event-status="" onclick="setEventStatusFilter('')">All</button>
-                            <button type="button" class="event-filter-chip" data-event-status="upcoming" onclick="setEventStatusFilter('upcoming')">Upcoming</button>
-                            <button type="button" class="event-filter-chip" data-event-status="ongoing" onclick="setEventStatusFilter('ongoing')">Ongoing</button>
-                            <button type="button" class="event-filter-chip" data-event-status="completed" onclick="setEventStatusFilter('completed')">Completed</button>
                         </div>
                     </div>
 
