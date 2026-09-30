@@ -1518,9 +1518,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     const setTabs = (activeRegister) => {
       document.querySelectorAll(".auth-tab").forEach((tab) => {
-        const active = activeRegister
-          ? tab.id.includes("register")
-          : tab.id.includes("login");
+        const active = tab.dataset.authView === (activeRegister ? "register" : "login");
         tab.classList.toggle("active", active);
         tab.setAttribute("aria-selected", String(active));
       });
