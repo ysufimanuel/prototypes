@@ -1,9 +1,11 @@
 const { auth, db } = require("../_lib/firebase-admin");
 const { requireSuperAdmin } = require("../_lib/auth");
+const { applyCors } = require("../_lib/cors");
 
 const ALLOWED_ROLES = ["user", "admin", "superadmin"];
 
 module.exports = async function handler(req, res) {
+  if (applyCors(req, res)) return;
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, message: "Method tidak diizinkan." });
   }
@@ -18,19 +20,13 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ success: false, message: "Data user belum lengkap." });
     }
     if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}`,
-      });
+      return res.status(400).json({ success: false, message: `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}` });
     }
     if (churchId && churchId !== requester.churchId) {
       return res.status(403).json({ success: false, message: "Tidak memiliki akses ke church tersebut." });
     }
 
-    const duplicate = await db.collection("users")
-      .where("username", "==", username)
-      .limit(1)
-      .get();
+    const duplicate = await db.collection("users").where("username", "==", username).limit(1).get();
     if (!duplicate.empty) {
       return res.status(409).json({ success: false, message: "Username sudah digunakan." });
     }
