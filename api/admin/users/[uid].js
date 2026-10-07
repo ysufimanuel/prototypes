@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, message: "User berhasil dihapus.", uid });
     }
 
-    const { nama, username, email, role } = req.body || {};
+    const { nama, username, email, role, password } = req.body || {};
     if (role !== undefined && !ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ success: false, message: `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}` });
     }
@@ -65,9 +65,14 @@ module.exports = async function handler(req, res) {
       }
     }
 
+    if (password !== undefined && password !== "" && String(password).length < 6) {
+      return res.status(400).json({ success: false, message: "Password minimal 6 karakter." });
+    }
+
     const authUpdate = {};
     if (nama) authUpdate.displayName = nama;
     if (email) authUpdate.email = email;
+    if (password) authUpdate.password = String(password);
     if (Object.keys(authUpdate).length) await auth.updateUser(uid, authUpdate);
 
     const updateData = {

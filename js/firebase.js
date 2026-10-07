@@ -557,6 +557,7 @@ async function createChurchUser(userData) {
           email: userData.email,
           password: userData.password,
           role: userData.role,
+          ...(userData.password ? { password: userData.password } : {}),
           churchId: _activeChurchId,
         }),
       },

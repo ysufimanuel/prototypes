@@ -6308,6 +6308,7 @@ async function saveUser(e) {
         username: username || email.split("@")[0],
         email,
         role,
+        ...(password ? { password } : {}),
       };
       console.log("[APP] UPDATED PROFILE:", updatedProfile);
       const result = await window.updateChurchUser(targetUid, updatedProfile);
