@@ -47,8 +47,16 @@ async function requireSuperAdmin(req, res) {
       churchId: userData.churchId,
     };
   } catch (error) {
-    console.error("[AUTH] Error:", error.message);
-    res.status(401).json({ success: false, message: "Token tidak valid atau sudah expired" });
+    console.error("[AUTH] verifyIdToken gagal:", {
+      code: error?.code || null,
+      message: error?.message || "Unknown auth error",
+    });
+
+    const safeCode = error?.code || "auth/unknown-error";
+    res.status(401).json({
+      success: false,
+      message: `Token Firebase ditolak (${safeCode}).`,
+    });
     return null;
   }
 }
