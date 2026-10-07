@@ -1,0 +1,47 @@
+name: Restore Firebase token refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-token-refresh.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Restore forced ID token refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("js/firebase.js")
+          text = path.read_text(encoding="utf-8")
+          old = "const token = await auth.currentUser.getIdToken();"
+          new = "const token = await auth.currentUser.getIdToken(true);"
+          if old in text:
+              text = text.replace(old, new, 1)
+              path.write_text(text, encoding="utf-8")
+          elif new not in text:
+              raise SystemExit("Target getIdToken() call not found")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/firebase.js
+          git commit -m "fix: refresh Firebase ID token before admin update"
+          git push origin main
+      - name: Remove temporary workflow
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-token-refresh.yml
+          git commit -m "chore: remove temporary token repair workflow"
+          git push origin main
