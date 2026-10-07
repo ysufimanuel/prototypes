@@ -541,7 +541,7 @@ async function createChurchUser(userData) {
   }
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await auth.currentUser.getIdToken(true);
 
     const response = await fetch(
       "/api/admin/create-user",
