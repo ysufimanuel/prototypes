@@ -1,5 +1,6 @@
 const { auth, db } = require("../../_lib/firebase-admin");
 const { requireSuperAdmin } = require("../../_lib/auth");
+const { applyCors } = require("../../_lib/cors");
 
 const ALLOWED_ROLES = ["user", "admin", "superadmin"];
 
@@ -8,6 +9,8 @@ function sameChurch(requester, user) {
 }
 
 module.exports = async function handler(req, res) {
+  if (applyCors(req, res)) return;
+
   const requester = await requireSuperAdmin(req, res);
   if (!requester) return;
 
@@ -17,9 +20,7 @@ module.exports = async function handler(req, res) {
   try {
     const userRef = db.collection("users").doc(uid);
     const userSnap = await userRef.get();
-    if (!userSnap.exists) {
-      return res.status(404).json({ success: false, message: "User Firestore tidak ditemukan." });
-    }
+    if (!userSnap.exists) return res.status(404).json({ success: false, message: "User Firestore tidak ditemukan." });
 
     const existingUser = userSnap.data();
     if (!sameChurch(requester, existingUser)) {
@@ -30,10 +31,7 @@ module.exports = async function handler(req, res) {
       const { nama, username, email, role } = req.body || {};
 
       if (role !== undefined && !ALLOWED_ROLES.includes(role)) {
-        return res.status(400).json({
-          success: false,
-          message: `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}`,
-        });
+        return res.status(400).json({ success: false, message: `Role tidak valid. Pilihan: ${ALLOWED_ROLES.join(", ")}` });
       }
       if (requester.uid === uid && role !== undefined && role !== existingUser.role) {
         return res.status(403).json({ success: false, message: "Super Admin tidak dapat mengubah role dirinya sendiri." });
@@ -45,7 +43,6 @@ module.exports = async function handler(req, res) {
           return res.status(409).json({ success: false, message: "Username sudah digunakan." });
         }
       }
-
       if (email && email !== existingUser.email) {
         const emailSnap = await db.collection("users").where("email", "==", email).limit(1).get();
         if (emailSnap.docs.some(doc => doc.id !== uid)) {
