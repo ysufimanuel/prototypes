@@ -621,6 +621,7 @@ async function updateChurchUser(uid, userData) {
           username: userData.username,
           email: userData.email,
           role: userData.role,
+          ...(userData.password ? { password: userData.password } : {}),
           churchId: _activeChurchId,
         }),
       },
