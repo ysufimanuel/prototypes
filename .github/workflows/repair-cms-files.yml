@@ -1,0 +1,53 @@
+name: Repair CMS files
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/repair-cms-files.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore firebase.js and add defaultData
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git show 1cf13b069889eb5c63df2445c91bf373aca63352:js/firebase.js > js/firebase.js
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("js/app.js")
+          text = path.read_text(encoding="utf-8")
+
+          marker = 'const defaultData = {'
+          if marker not in text:
+              insert = '''\n// ========================================\n// SAFE DEFAULT DATA\n// ========================================\n// Firebase adalah sumber data utama. Default ini hanya dipakai\n// sebagai fallback lokal/migrasi agar getData() tidak crash saat\n// localStorage belum memiliki data CMS.\nconst defaultData = {\n  members: [],\n  families: [],\n  groups: [],\n  events: [],\n  attendance: [],\n  donations: [],\n  donors: [],\n  volunteers: [],\n  assignments: [],\n  users: [],\n  announcements: [],\n  pemasukan: [],\n  pengeluaran: [],\n  financeCategories: [],\n  approvalHistory: [],\n  notifications: [],\n  deaths: [],\n};\n\n'''
+              path.write_text(insert + text, encoding="utf-8")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/firebase.js js/app.js
+          git commit -m "fix: restore firebase.js and define defaultData"
+          git push origin main
+
+      - name: Remove repair workflow
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-cms-files.yml
+          git commit -m "chore: remove temporary repair workflow"
+          git push origin main
