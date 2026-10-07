@@ -1,3 +1,30 @@
+
+// ========================================
+// SAFE DEFAULT DATA
+// ========================================
+// Firebase adalah sumber data utama. Default ini hanya dipakai
+// sebagai fallback lokal/migrasi agar getData() tidak crash saat
+// localStorage belum memiliki data CMS.
+const defaultData = {
+  members: [],
+  families: [],
+  groups: [],
+  events: [],
+  attendance: [],
+  donations: [],
+  donors: [],
+  volunteers: [],
+  assignments: [],
+  users: [],
+  announcements: [],
+  pemasukan: [],
+  pengeluaran: [],
+  financeCategories: [],
+  approvalHistory: [],
+  notifications: [],
+  deaths: [],
+};
+
 /**
  * Church Management System V5
  * Complete JavaScript Application with Role-Based Access Control
