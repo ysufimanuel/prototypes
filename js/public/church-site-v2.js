@@ -1,3 +1,5 @@
+import { getDoc, getDocs, collection, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
 const root = document.getElementById('church-site');
 const loading = document.getElementById('site-loading');
 const errorBox = document.getElementById('site-error');
@@ -11,20 +13,20 @@ function card(title, body) {
 }
 
 async function main() {
-  if (!slug || !window.db || !window.firebaseDoc || !window.firebaseGetDoc || !window.firebaseCollection || !window.firebaseGetDocs) throw new Error('SITE_NOT_FOUND');
+  if (!slug || !window.db) throw new Error('SITE_NOT_FOUND');
   const db = window.db;
-  const slugDoc = await window.firebaseGetDoc(window.firebaseDoc(db, 'siteSlugs', slug));
+  const slugDoc = await getDoc(doc(db, 'siteSlugs', slug));
   if (!slugDoc.exists()) throw new Error('SITE_NOT_FOUND');
   const churchId = slugDoc.data().churchId;
   if (!churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${churchId}`;
   const [configDoc, navDoc, pageDoc, eventsSnap, ministriesSnap] = await Promise.all([
-    window.firebaseGetDoc(window.firebaseDoc(db, base, 'config/site')),
-    window.firebaseGetDoc(window.firebaseDoc(db, base, 'navigation/main')),
-    window.firebaseGetDoc(window.firebaseDoc(db, base, 'pages/home')),
-    window.firebaseGetDocs(window.firebaseCollection(db, base, 'events')),
-    window.firebaseGetDocs(window.firebaseCollection(db, base, 'ministries'))
+    getDoc(doc(db, base, 'config/site')),
+    getDoc(doc(db, base, 'navigation/main')),
+    getDoc(doc(db, base, 'pages/home')),
+    getDocs(collection(db, base, 'events')),
+    getDocs(collection(db, base, 'ministries'))
   ]);
   if (!configDoc.exists() || configDoc.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
 
