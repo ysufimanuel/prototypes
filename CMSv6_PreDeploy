@@ -1,0 +1,605 @@
+# CMSv6 - Roadmap Stabilization sampai Production
+
+## Tujuan
+
+Membawa branch `eksperimen-fitur` ke kondisi stabil, teruji, lalu aman untuk masuk ke `main` dan dideploy ke production.
+
+> **Catatan penting:** Jangan deploy `eksperimen-fitur` langsung ke production. Branch ini punya perubahan arsitektur yang cukup besar, terutama pada Chat/Firebase.
+
+---
+
+# FASE 0 - Backup & Checkpoint
+
+## 0.1 Freeze branch eksperimen
+
+- [ ] Jangan tambah fitur baru dulu.
+- [ ] Pastikan branch yang sedang dikerjakan adalah `eksperimen-fitur`.
+- [ ] Commit kondisi sekarang sebagai checkpoint.
+
+```bash
+git checkout eksperimen-fitur
+git add .
+git commit -m "chore: checkpoint before stabilization"
+```
+
+## 0.2 Pastikan bisa rollback
+
+- [ ] Catat commit checkpoint.
+- [ ] Jangan hapus branch eksperimen.
+- [ ] Jangan melakukan force push tanpa alasan yang jelas.
+
+---
+
+# FASE 1 - Audit Arsitektur & Data Model
+
+Dikerjakan sebelum memperbaiki bug satu per satu.
+
+## 1.1 Tentukan sumber data utama
+
+Pastikan sistem secara konsisten menggunakan model data yang sama.
+
+### User
+
+- [ ] Tentukan apakah sumber utama user adalah `data.users` atau `data.members`.
+- [ ] Jangan biarkan sebagian modul memakai `users` dan modul lain memakai `members` tanpa adapter yang jelas.
+
+### User ID
+
+- [ ] Tentukan bahwa identitas user utama menggunakan Firebase Auth UID jika sistem Firebase memang menjadi sumber autentikasi.
+- [ ] Audit seluruh `id`, `uid`, `senderId`, `receiverId` agar tidak tercampur.
+
+### Chat
+
+- [ ] Tentukan apakah chat berasal dari Firebase/Firestore atau local `data.messages`.
+- [ ] Hindari dua sumber kebenaran yang bisa menghasilkan data berbeda.
+
+## 1.2 Audit `getData()` / `saveData()`
+
+- [ ] Pastikan `getData()` tidak menghasilkan struktur data yang berbeda-beda.
+- [ ] Pastikan `data.messages` selalu array jika memang digunakan.
+- [ ] Pastikan `saveData()` mempunyai perilaku yang jelas saat Firebase tersedia.
+- [ ] Pastikan fallback `localStorage` tidak membuat data Firebase dan local berbeda tanpa alasan.
+
+---
+
+# FASE 2 - Audit Dependency Firebase
+
+Cari semua dependency global yang dipakai `app.js`.
+
+## 2.1 Global yang wajib diverifikasi
+
+- [ ] `window.auth`
+- [ ] `window.getActiveChurchId`
+- [ ] `window.addChatMessage`
+- [ ] `window.listenToChatMessages`
+- [ ] `window.loginWithFirebase`
+
+Untuk masing-masing:
+
+- [ ] Function/object benar-benar didefinisikan.
+- [ ] File yang mendefinisikan dependency dimuat sebelum `app.js`.
+- [ ] Nama function sama persis.
+- [ ] Parameter yang dikirim sesuai.
+- [ ] Return value sesuai dengan yang diharapkan `app.js`.
+
+---
+
+# FASE 3 - FIX & VALIDASI CHAT
+
+**Prioritas #1 berdasarkan perbedaan branch saat ini.**
+
+## 3.1 Auth
+
+- [ ] `window.auth.currentUser` tersedia setelah login.
+- [ ] UID user yang login dapat dibaca.
+- [ ] Logout membersihkan state dengan benar.
+
+## 3.2 Church ID
+
+- [ ] `window.getActiveChurchId()` mengembalikan `churchId` yang valid.
+- [ ] Chat gagal dengan pesan yang jelas jika `churchId` tidak tersedia.
+- [ ] User tidak bisa mengirim message ke church yang tidak semestinya.
+
+## 3.3 Target user
+
+Audit `openChat()`.
+
+- [ ] Pastikan parameter yang dikirim tombol/chat contact adalah UID yang benar.
+- [ ] Pastikan UID tersebut bisa ditemukan di `data.users`.
+- [ ] Jangan mengirim ID integer/member lama jika sistem Chat sudah memakai Firebase UID.
+
+## 3.4 Kirim pesan
+
+Audit `sendMessage()`.
+
+Urutan yang harus terjadi:
+
+```text
+Input message
+    ↓
+Validasi content
+    ↓
+Validasi currentChatId
+    ↓
+Validasi Firebase Auth
+    ↓
+Ambil churchId
+    ↓
+Buat payload message
+    ↓
+addChatMessage()
+    ↓
+Firestore write berhasil
+    ↓
+UI diperbarui
+```
+
+- [ ] Pesan kosong ditolak.
+- [ ] User yang belum login tidak bisa mengirim.
+- [ ] `churchId` wajib ada.
+- [ ] `senderId` berasal dari Auth UID.
+- [ ] `receiverId` adalah UID target.
+- [ ] Message berhasil tersimpan di Firestore.
+- [ ] UI menampilkan pesan setelah berhasil.
+
+## 3.5 Realtime listener
+
+- [ ] `window.listenToChatMessages` tersedia.
+- [ ] Listener aktif ketika chat dibuka.
+- [ ] Listener lama dihentikan ketika pindah chat.
+- [ ] Tidak terjadi listener ganda.
+- [ ] Message realtime muncul tanpa refresh.
+- [ ] Menutup halaman/chat tidak meninggalkan listener yang tidak diperlukan.
+
+## 3.6 Test Chat minimal
+
+- [ ] User A → User B
+- [ ] User B → User A
+- [ ] Refresh halaman
+- [ ] Buka chat lain
+- [ ] Kembali ke chat sebelumnya
+- [ ] Kirim beberapa message berturut-turut
+- [ ] Internet mati lalu kembali online
+- [ ] User tanpa `churchId`
+- [ ] User target tidak ditemukan
+
+---
+
+# FASE 4 - Authentication & Session
+
+## 4.1 Login
+
+- [ ] Login credential valid berhasil.
+- [ ] Login credential salah ditolak.
+- [ ] Error ditampilkan dengan jelas.
+- [ ] Role user terbaca dengan benar.
+- [ ] `churchId` user terbaca dengan benar.
+
+## 4.2 Session
+
+- [ ] Refresh halaman tidak merusak session.
+- [ ] Hard refresh tidak menyebabkan state korup.
+- [ ] Logout benar-benar membersihkan session.
+- [ ] User tidak bisa membuka halaman protected setelah logout.
+
+## 4.3 Direct URL
+
+Test membuka halaman langsung melalui URL, bukan hanya melalui menu:
+
+- [ ] Dashboard
+- [ ] Members/Users
+- [ ] Events
+- [ ] Donations
+- [ ] Attendance
+- [ ] Chat
+- [ ] Halaman admin/superadmin
+
+---
+
+# FASE 5 - Regression Test Semua Modul
+
+Setelah Chat stabil, jangan langsung deploy. Test modul lama karena perubahan `app.js` besar bisa menyebabkan bug samping.
+
+## 5.1 CRUD
+
+| Modul | Create | Read | Update | Delete |
+|---|---:|---:|---:|---:|
+| Users | [ ] | [ ] | [ ] | [ ] |
+| Members | [ ] | [ ] | [ ] | [ ] |
+| Events | [ ] | [ ] | [ ] | [ ] |
+| Donations | [ ] | [ ] | [ ] | [ ] |
+| Attendance | [ ] | [ ] | [ ] | [ ] |
+| Messages | [ ] | [ ] | [ ] | [ ] |
+
+## 5.2 Role
+
+### Superadmin
+
+- [ ] Read
+- [ ] Create
+- [ ] Update
+- [ ] Delete
+- [ ] Akses fitur khusus superadmin
+
+### Admin
+
+- [ ] Read
+- [ ] Create
+- [ ] Update sesuai rule
+- [ ] Delete sesuai rule
+- [ ] Tidak bisa melakukan aksi superadmin
+
+### User
+
+- [ ] Read data yang memang boleh dilihat
+- [ ] Create data yang memang boleh dibuat
+- [ ] Tidak bisa update/delete data yang dilarang
+- [ ] Tidak bisa membuka fitur admin
+
+---
+
+# FASE 6 - Firestore Security Rules
+
+**Wajib selesai sebelum production.**
+
+- [ ] User hanya dapat membaca data yang memang boleh dibaca.
+- [ ] User tidak dapat membaca data church lain.
+- [ ] User tidak dapat mengubah `role` sendiri.
+- [ ] User tidak dapat mengubah `churchId` untuk bypass akses.
+- [ ] Admin tidak mendapat permission superadmin secara tidak sengaja.
+- [ ] Chat membatasi akses berdasarkan user/church sesuai desain.
+- [ ] Create/update/delete diuji langsung terhadap rules.
+- [ ] Permission denied menghasilkan error yang ditangani UI.
+
+> Jangan mengandalkan validasi JavaScript frontend sebagai security boundary. Frontend bisa dimodifikasi oleh client.
+
+---
+
+# FASE 7 - LocalStorage, Migration & Data Safety
+
+`initData()` memiliki logic inisialisasi/migrasi yang menyentuh:
+
+- `cmsV5Initialized`
+- `cmsV2Data`
+- `cmsV3Initialized`
+
+Test dua kondisi.
+
+## 7.1 Fresh installation
+
+- [ ] LocalStorage kosong.
+- [ ] Aplikasi bisa start.
+- [ ] Default data dibuat tanpa error.
+- [ ] Login tetap berfungsi.
+
+## 7.2 Existing installation
+
+- [ ] User lama membuka versi baru.
+- [ ] Data lama tidak terhapus tanpa alasan.
+- [ ] Data berhasil dimigrasikan jika memang diperlukan.
+- [ ] Tidak terjadi overwrite data penting.
+
+---
+
+# FASE 8 - UI & UX Regression
+
+## 8.1 Translation
+
+- [ ] Semua label utama berubah mengikuti bahasa.
+- [ ] `<select>` tetap memiliki option yang benar.
+- [ ] Placeholder tetap benar.
+- [ ] Tidak ada text yang berubah menjadi kosong setelah `applyLanguage()`.
+
+## 8.2 Responsive
+
+Test minimal:
+
+- [ ] Desktop
+- [ ] Laptop
+- [ ] Tablet
+- [ ] Android
+
+Fokus pada:
+
+- [ ] Sidebar
+- [ ] Navbar
+- [ ] Modal
+- [ ] Table
+- [ ] Form
+- [ ] Chat
+- [ ] Dropdown
+- [ ] Notification
+- [ ] Pagination
+
+---
+
+# FASE 9 - Error & Failure Testing
+
+Sengaja test kondisi gagal.
+
+- [ ] Internet mati.
+- [ ] Firebase gagal diakses.
+- [ ] Firestore permission denied.
+- [ ] Login gagal.
+- [ ] User tidak ditemukan.
+- [ ] `churchId` kosong.
+- [ ] Data kosong.
+- [ ] Data tidak sesuai format.
+- [ ] Request gagal di tengah proses.
+
+Pastikan aplikasi tidak berhenti dengan error mentah seperti:
+
+```text
+Uncaught TypeError
+Cannot read properties of undefined
+```
+
+Error tetap harus tercatat di console untuk debugging, tetapi user harus mendapat feedback yang masuk akal.
+
+---
+
+# FASE 10 - Code Quality Check
+
+- [ ] Tidak ada `console.log()` debug yang tidak diperlukan.
+- [ ] Tidak ada temporary test code.
+- [ ] Tidak ada function mati/duplikat tanpa alasan.
+- [ ] Tidak ada hardcoded credential/secret.
+- [ ] Tidak ada Firebase Admin/service-account credential di frontend.
+- [ ] Nama variabel konsisten.
+- [ ] Tidak ada referensi file/path yang hanya ada di branch eksperimen.
+- [ ] Tidak ada dependency yang belum masuk `package.json`.
+
+---
+
+# FASE 11 - Local Production Build
+
+Jalankan:
+
+```bash
+npm install
+npm run build
+```
+
+Jika menggunakan Vite, lanjut:
+
+```bash
+npm run preview
+```
+
+## 11.1 Test hasil build
+
+- [ ] Build berhasil tanpa error.
+- [ ] Tidak ada missing module.
+- [ ] Tidak ada asset path rusak.
+- [ ] Firebase tetap bisa digunakan.
+- [ ] Routing bekerja.
+- [ ] Login bekerja.
+- [ ] Chat bekerja.
+- [ ] CRUD bekerja.
+
+> Jangan hanya mengetes `npm run dev`. Bug production build sering punya bakat muncul setelah semua orang sudah merasa aman.
+
+---
+
+# FASE 12 - Staging
+
+Jangan langsung production.
+
+```text
+experimen-fitur
+       ↓
+staging
+       ↓
+main
+       ↓
+production
+```
+
+Di staging:
+
+- [ ] Login
+- [ ] Session
+- [ ] Role
+- [ ] CRUD
+- [ ] Chat realtime
+- [ ] Security Rules
+- [ ] Refresh
+- [ ] Mobile
+- [ ] Error handling
+- [ ] Data persistence
+
+Semua harus dites menggunakan **production build**.
+
+---
+
+# FASE 13 - Release Candidate
+
+Buat checkpoint release candidate setelah staging lulus.
+
+```bash
+git add .
+git commit -m "chore: prepare release candidate"
+```
+
+Checklist:
+
+- [ ] Tidak ada known critical bug.
+- [ ] Tidak ada perubahan fitur baru.
+- [ ] Security Rules sudah diverifikasi.
+- [ ] Build sukses.
+- [ ] Staging sukses.
+- [ ] Backup tersedia.
+
+---
+
+# FASE 14 - Masuk ke `main`
+
+Karena `main` dan `eksperimen-fitur` sebelumnya terdeteksi **tidak memiliki common ancestor**, jangan mengasumsikan merge biasa akan aman.
+
+Gunakan pendekatan yang menjaga perubahan tetap terkontrol:
+
+```text
+eksperimen-fitur
+        ↓
+perbaikan + testing
+        ↓
+release candidate
+        ↓
+review perubahan
+        ↓
+masukkan perubahan yang sudah stabil ke main
+        ↓
+production
+```
+
+- [ ] Review diff final.
+- [ ] Pastikan file yang masuk memang diperlukan.
+- [ ] Pastikan tidak membawa eksperimen/debug code.
+- [ ] Pastikan `main` tetap bisa build.
+
+---
+
+# FASE 15 - Final Production Check
+
+Tepat sebelum deploy:
+
+- [ ] `git status` bersih.
+- [ ] Commit final sudah jelas.
+- [ ] Build sukses.
+- [ ] Firebase config benar.
+- [ ] Firestore rules benar.
+- [ ] Production environment benar.
+- [ ] Tidak ada secret di frontend.
+- [ ] Database production sudah dibackup / ada recovery plan.
+- [ ] Smoke test sudah dilakukan.
+
+---
+
+# FASE 16 - Production Deploy
+
+Deploy `main`, bukan branch eksperimen.
+
+Setelah deploy:
+
+- [ ] Login.
+- [ ] Buka dashboard.
+- [ ] Buka data user/member.
+- [ ] Create satu data test yang aman.
+- [ ] Update data test.
+- [ ] Delete data test jika sesuai permission.
+- [ ] Kirim chat.
+- [ ] Terima chat realtime.
+- [ ] Refresh halaman.
+- [ ] Logout.
+- [ ] Cek browser console untuk error.
+- [ ] Cek Firebase/Firestore untuk error permission.
+
+---
+
+# Prioritas Pengerjaan Sekarang
+
+Jangan mengerjakan semuanya sekaligus. Urutan kerja yang disarankan:
+
+## Sprint 1
+
+- [ ] Freeze `eksperimen-fitur`
+- [ ] Audit `data.users` vs `data.members`
+- [ ] Audit `id` vs Firebase UID
+- [ ] Audit `window.auth`
+- [ ] Audit `getActiveChurchId()`
+- [ ] Audit `addChatMessage()`
+- [ ] Audit `listenToChatMessages()`
+
+## Sprint 2
+
+- [ ] Fix `openChat()`
+- [ ] Fix `sendMessage()`
+- [ ] Fix realtime listener lifecycle
+- [ ] Test A → B
+- [ ] Test B → A
+- [ ] Test refresh
+- [ ] Test pindah chat
+
+## Sprint 3
+
+- [ ] Regression CRUD
+- [ ] Regression role
+- [ ] Regression auth/session
+- [ ] Regression localStorage/migration
+
+## Sprint 4
+
+- [ ] Audit Firestore Security Rules
+- [ ] Responsive test
+- [ ] Error handling test
+- [ ] Code cleanup
+- [ ] Production build
+
+## Sprint 5
+
+- [ ] Staging deploy
+- [ ] Full staging test
+- [ ] Release candidate
+- [ ] Review final diff
+- [ ] Masukkan ke `main`
+- [ ] Production deploy
+- [ ] Smoke test production
+
+---
+
+# Definition of Done
+
+Branch dianggap **siap deploy** hanya jika semua kondisi berikut terpenuhi:
+
+```text
+[ ] Build production sukses
+[ ] Auth stabil
+[ ] Session stabil
+[ ] Role stabil
+[ ] churchId stabil
+[ ] UID konsisten
+[ ] Chat realtime stabil
+[ ] CRUD utama stabil
+[ ] Firestore Rules teruji
+[ ] Refresh tidak merusak aplikasi
+[ ] Migration tidak menghapus data tanpa sengaja
+[ ] Mobile layout aman
+[ ] Error handling aman
+[ ] Tidak ada secret di frontend
+[ ] Tidak ada critical bug yang diketahui
+[ ] Staging lulus
+[ ] Release candidate dibuat
+[ ] main sudah diverifikasi
+```
+
+## Titik Fokus Utama
+
+**Jangan pindah ke fase berikutnya kalau fase sebelumnya masih punya bug critical.**
+
+Urutan paling penting untuk kondisi kode sekarang:
+
+```text
+CHAT
+ ↓
+UID
+ ↓
+CHURCH ID
+ ↓
+FIREBASE FUNCTIONS
+ ↓
+REALTIME LISTENER
+ ↓
+CRUD
+ ↓
+AUTH / SESSION
+ ↓
+SECURITY RULES
+ ↓
+BUILD
+ ↓
+STAGING
+ ↓
+MAIN
+ ↓
+PRODUCTION
+```
