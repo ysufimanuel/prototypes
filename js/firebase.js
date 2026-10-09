@@ -53,6 +53,7 @@ try {
     await import("https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js");
   const {
     getFirestore,
+    connectFirestoreEmulator,
     collection,
     addDoc,
     getDocs,
@@ -70,6 +71,7 @@ try {
     await import("https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js");
   const {
     getAuth,
+    connectAuthEmulator,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     onAuthStateChanged,
@@ -81,6 +83,20 @@ try {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
+
+  // Local development memakai Auth + Firestore Emulator.
+  // Production tetap menggunakan Firebase Production seperti biasa.
+  const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(
+    window.location.hostname,
+  );
+
+  if (isLocalhost) {
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", {
+      disableWarnings: true,
+    });
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    console.log("[FIREBASE] Local emulator mode enabled");
+  }
 
   window.firebaseApp = app;
   window.db = db;
@@ -211,7 +227,7 @@ async function addDocument(collectionName, data) {
 }
 
 // ========================================
-// CHAT MESSAGES â€” ROOT COLLECTION
+// CHAT MESSAGES — ROOT COLLECTION
 // ========================================
 
 async function addChatMessage(data) {
