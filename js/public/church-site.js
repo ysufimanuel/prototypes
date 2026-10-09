@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig, 'public-site');
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
-const state = { slug: '', churchId: '', config: null, navigation: null, page: null, events: [] };
+const state = { slug: '', churchId: '', route: '/', config: null, navigation: null, page: null, events: [], ministries: [] };
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'\"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -27,9 +27,32 @@ function slugFromPath() {
   return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
 }
 
+function routeFromPath(slug) {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const prefix = `/church/${encodeURIComponent(slug)}`;
+  if (pathname === prefix || pathname === `${prefix}/`) return '/';
+  if (pathname.startsWith(`${prefix}/`)) {
+    const route = pathname.slice(prefix.length) || '/';
+    return `/${decodeURIComponent(route.replace(/^\/+/, ''))}`;
+  }
+  return '/';
+}
+
+function normalizePageSlug(value = '') {
+  const slug = String(value || '/').trim();
+  if (!slug || slug === '/') return '/';
+  return `/${slug.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+}
+
+function publicUrl(target = '/') {
+  const route = normalizePageSlug(target);
+  return route === '/' ? `/church/${encodeURIComponent(state.slug)}` : `/church/${encodeURIComponent(state.slug)}${route}`;
+}
+
 async function loadSite() {
   state.slug = slugFromPath();
   if (!state.slug) throw new Error('SLUG_MISSING');
+  state.route = routeFromPath(state.slug);
 
   const slugSnap = await getDoc(doc(db, 'siteSlugs', state.slug));
   if (!slugSnap.exists()) throw new Error('SITE_NOT_FOUND');
@@ -37,10 +60,10 @@ async function loadSite() {
   if (!state.churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${state.churchId}`;
-  const [configSnap, navSnap, homeSnap, eventsSnap, ministriesSnap] = await Promise.all([
+  const [configSnap, navSnap, pagesSnap, eventsSnap, ministriesSnap] = await Promise.all([
     getDoc(doc(db, base, 'config/site')),
     getDoc(doc(db, base, 'navigation/main')),
-    getDoc(doc(db, base, 'pages/home')),
+    getDocs(collection(db, base, 'pages')),
     getDocs(collection(db, base, 'events')),
     getDocs(collection(db, base, 'ministries'))
   ]);
@@ -48,9 +71,12 @@ async function loadSite() {
   if (!configSnap.exists() || configSnap.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
   state.config = configSnap.data();
   state.navigation = navSnap.exists() ? navSnap.data() : { items: [] };
-  state.page = homeSnap.exists() ? homeSnap.data() : null;
   state.events = eventsSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
   state.ministries = ministriesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+
+  const pages = pagesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  state.page = pages.find((page) => normalizePageSlug(page.slug) === state.route);
+  if (!state.page || state.page.published === false) throw new Error('PAGE_NOT_FOUND');
 }
 
 function formatEventDate(value) {
@@ -98,6 +124,12 @@ function sectionHtml(section, config) {
       return `<section class="hero"><div class="container"><span class="eyebrow">${escapeHtml(config.siteName)}</span><h1>${escapeHtml(c.title || config.tagline || 'Selamat datang')}</h1><p>${escapeHtml(c.description || '')}</p></div></section>`;
     case 'welcome':
       return `<section class="section"><div class="container"><span class="eyebrow">WELCOME</span><h2>${escapeHtml(c.title || 'Selamat Datang')}</h2><p>${escapeHtml(c.description || 'Kami senang menyambut Anda di website gereja kami.')}</p></div></section>`;
+    case 'about':
+      return `<section class="section"><div class="container"><span class="eyebrow">ABOUT</span><h2>${escapeHtml(c.title || 'Tentang Kami')}</h2><p>${escapeHtml(c.description || 'Kenali lebih dekat gereja dan komunitas kami.')}</p></div></section>`;
+    case 'cta':
+      return `<section class="section alt"><div class="container"><span class="eyebrow">CONNECT</span><h2>${escapeHtml(c.title || 'Mari Terhubung')}</h2><p>${escapeHtml(c.description || 'Kami ingin membantu Anda menemukan tempat untuk bertumbuh dan terhubung.')}</p></div></section>`;
+    case 'sermons':
+      return `<section class="section"><div class="container"><span class="eyebrow">RESOURCES</span><h2>${escapeHtml(c.title || 'Resources')}</h2><p>${escapeHtml(c.description || 'Materi dan khotbah akan tersedia di sini.')}</p></div></section>`;
     case 'serviceSchedule': {
       const cards = serviceCards(c.limit || 4);
       return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${escapeHtml(c.title || 'Jadwal Ibadah')}</h2><div class="services-grid">${cards || '<p>Belum ada jadwal ibadah yang dipublikasikan.</p>'}</div></div></section>`;
@@ -119,7 +151,8 @@ function sectionHtml(section, config) {
 
 function render() {
   const config = state.config;
-  document.title = config.seo?.title || config.siteName || 'Website Gereja';
+  const pageTitle = state.page?.title || config.siteName || 'Website Gereja';
+  document.title = state.route === '/' ? (config.seo?.title || pageTitle) : `${pageTitle} | ${config.siteName || 'Gereja'}`;
   document.querySelector('meta[name="description"]')?.setAttribute('content', config.seo?.description || config.tagline || 'Website gereja');
   document.documentElement.style.setProperty('--primary', config.theme?.primary || '#ff6b00');
   document.documentElement.style.setProperty('--secondary', config.theme?.secondary || '#1f2937');
@@ -130,10 +163,10 @@ function render() {
 
   $('church-site').innerHTML = `
     <header class="site-header"><div class="container nav-wrap">
-      <a class="brand" href="/church/${encodeURIComponent(state.slug)}"><img class="brand-logo ${config.logoUrl ? '' : 'hidden'}" src="${escapeHtml(config.logoUrl)}" alt=""><span>${escapeHtml(config.siteName || 'Gereja')}</span></a>
-      <nav>${nav.map(item => `<a href="${escapeHtml(item.target || '#')}">${escapeHtml(item.label)}</a>`).join('')}</nav>
+      <a class="brand" href="${publicUrl('/')}" ><img class="brand-logo ${config.logoUrl ? '' : 'hidden'}" src="${escapeHtml(config.logoUrl)}" alt=""><span>${escapeHtml(config.siteName || 'Gereja')}</span></a>
+      <nav>${nav.map(item => `<a href="${escapeHtml(publicUrl(item.target || '/'))}">${escapeHtml(item.label)}</a>`).join('')}</nav>
     </div></header>
-    <main>${sections.map(section => sectionHtml(section, config)).join('')}</main>
+    <main><div class="container"><div class="page-heading"><span class="eyebrow">${escapeHtml(config.siteName || 'GEREJA')}</span><h1>${escapeHtml(pageTitle)}</h1></div></div>${sections.map(section => sectionHtml(section, config)).join('')}</main>
     <footer class="site-footer"><div class="container"><strong>${escapeHtml(config.siteName || 'Gereja')}</strong><span>${escapeHtml(config.tagline || '')}</span></div></footer>`;
 
   $('site-loading').classList.add('hidden');
@@ -143,5 +176,6 @@ function render() {
 loadSite().then(render).catch((error) => {
   console.error('[PUBLIC WEBSITE]', error);
   $('site-loading').classList.add('hidden');
+  $('site-error').textContent = error.message === 'PAGE_NOT_FOUND' ? 'Halaman tidak ditemukan.' : 'Website tidak ditemukan atau belum dipublikasikan.';
   $('site-error').classList.remove('hidden');
 });
