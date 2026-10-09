@@ -82,8 +82,9 @@ async function saveDraft(){
 async function publish(){
   await saveDraft();
   const result=await api('/publish',{method:'POST',body:'{}'});
+  const eventsResult=await api('/publish-events',{method:'POST',body:'{}'});
   await loadDraft();
-  return result;
+  return {...result,eventCount:eventsResult.eventCount};
 }
 
 function bindUI(){
@@ -91,7 +92,7 @@ function bindUI(){
   document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>switchSection(btn.dataset.go)));
   $('website-logout')?.addEventListener('click',async()=>{await firebaseLogout();});
   $('appearance-form')?.addEventListener('submit',async(e)=>{e.preventDefault();try{await saveDraft();alert('Draft website berhasil disimpan.');}catch(err){console.error(err);alert(err.message||'Gagal menyimpan draft.');}});
-  $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(result.message||'Website berhasil dipublikasikan.');}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
+  $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(`${result.message||'Website berhasil dipublikasikan.'}${typeof result.eventCount==='number'?` Event publik: ${result.eventCount}.`:''}`);}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
   $('preview-open')?.addEventListener('click',()=>{const href=$('website-public-link')?.href;if(href && href!=='#')window.open(href,'_blank','noopener');else alert('Website publik belum memiliki slug.');});
 }
 
