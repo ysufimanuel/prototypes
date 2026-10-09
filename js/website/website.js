@@ -3,8 +3,9 @@ import { onAuthStateChanged, getIdToken } from 'https://www.gstatic.com/firebase
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { user:null, profile:null, churchId:null, church:null, config:null, navigation:null, pages:[] };
+const state = { user:null, profile:null, churchId:null, church:null, config:null, navigation:null, pages:[], editingPage:null };
 const API_BASE = '/api/admin/website';
+const SECTION_TYPES = ['hero','welcome','serviceSchedule','featuredEvents','about','ministries','sermons','contact','cta'];
 
 function show(id){ $(id)?.classList.remove('hidden'); }
 function hide(id){ $(id)?.classList.add('hidden'); }
@@ -12,6 +13,8 @@ function setText(id,value){ const el=$(id); if(el) el.textContent=value ?? ''; }
 function setValue(id,value){ const el=$(id); if(el) el.value=value ?? ''; }
 function getValue(id){ return $(id)?.value?.trim() || ''; }
 function escapeHtml(value){ return String(value ?? '').replace(/[&<>\\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[m])); }
+function sectionLabel(type){ return ({hero:'Hero',welcome:'Welcome',serviceSchedule:'Jadwal Ibadah',featuredEvents:'Event Terdekat',about:'Tentang Kami',ministries:'Pelayanan',sermons:'Resources / Khotbah',contact:'Kontak',cta:'Call to Action'}[type] || type); }
+function sectionDefaults(type){ return {id:`section-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,type,enabled:true,order:1,config:{}}; }
 
 async function api(path, options={}){
   if(!state.user) throw new Error('AUTH_REQUIRED');
@@ -29,7 +32,8 @@ function switchSection(section){
 
 function renderPages(){
   const el=$('website-pages-list'); if(!el)return;
-  el.innerHTML=state.pages.map(page=>`<div class="page-item"><div class="page-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.slug)}</small></div></div><button class="website-btn secondary" type="button" data-page="${escapeHtml(page.id)}">Edit</button></div>`).join('');
+  el.innerHTML=state.pages.map(page=>`<div class="page-item"><div class="page-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.slug)} · ${page.published===false?'Draft':'Published'}</small></div></div><button class="website-btn secondary page-edit-btn" type="button" data-page="${escapeHtml(page.id)}">Edit</button></div>`).join('');
+  el.querySelectorAll('.page-edit-btn').forEach(btn=>btn.addEventListener('click',()=>openPageEditor(btn.dataset.page)));
 }
 
 function renderNavigation(){
@@ -79,6 +83,58 @@ async function saveDraft(){
   renderOverview(); return result;
 }
 
+function openPageEditor(pageId){
+  const page=state.pages.find(item=>item.id===pageId); if(!page)return;
+  state.editingPage=JSON.parse(JSON.stringify(page));
+  setValue('page-editor-id',page.id); setValue('page-editor-title-input',page.title); setValue('page-editor-slug',page.slug); $('page-editor-published').checked=page.published!==false;
+  renderEditorSections(); show('page-editor-modal'); document.body.classList.add('modal-open');
+}
+
+function closePageEditor(){ hide('page-editor-modal'); document.body.classList.remove('modal-open'); state.editingPage=null; }
+
+function renderEditorSections(){
+  const el=$('page-editor-sections'); if(!el || !state.editingPage)return;
+  const sections=(state.editingPage.sections||[]).slice().sort((a,b)=>(a.order||0)-(b.order||0));
+  el.innerHTML=sections.map((section,index)=>{
+    const c=section.config||{};
+    return `<article class="editor-section" data-editor-section="${escapeHtml(section.id)}"><div class="editor-section-top"><div><strong>${index+1}. ${escapeHtml(sectionLabel(section.type))}</strong><small>${escapeHtml(section.type)}</small></div><div class="editor-section-actions"><label class="editor-checkbox"><input class="section-enabled" type="checkbox" ${section.enabled!==false?'checked':''}> Aktif</label><button class="icon-btn section-delete" type="button" title="Hapus"><i class="fas fa-trash"></i></button></div></div><div class="form-grid"><label>Jenis<select class="section-type">${SECTION_TYPES.map(type=>`<option value="${type}" ${section.type===type?'selected':''}>${escapeHtml(sectionLabel(type))}</option>`).join('')}</select></label><label>Judul<input class="section-title" type="text" maxlength="160" value="${escapeHtml(c.title||'')}"></label><label class="full">Deskripsi<textarea class="section-description" rows="3" maxlength="500">${escapeHtml(c.description||'')}</textarea></label>${['serviceSchedule','featuredEvents','ministries'].includes(section.type)?`<label>Batas Item<input class="section-limit" type="number" min="1" max="20" value="${Number(c.limit)||4}"></label>`:''}</div></article>`;
+  }).join('');
+  el.querySelectorAll('.section-delete').forEach(btn=>btn.addEventListener('click',()=>{btn.closest('.editor-section')?.remove();syncEditorSections();}));
+  el.querySelectorAll('.section-type').forEach(select=>select.addEventListener('change',()=>{syncEditorSections();renderEditorSections();}));
+}
+
+function syncEditorSections(){
+  if(!state.editingPage)return;
+  const cards=[...document.querySelectorAll('.editor-section')];
+  state.editingPage.sections=cards.map((card,index)=>{
+    const id=card.dataset.editorSection;
+    const old=(state.editingPage.sections||[]).find(section=>section.id===id)||sectionDefaults('welcome');
+    const type=card.querySelector('.section-type')?.value || old.type;
+    const config={...(old.config||{}),title:card.querySelector('.section-title')?.value?.trim()||'',description:card.querySelector('.section-description')?.value?.trim()||''};
+    const limit=card.querySelector('.section-limit'); if(limit)config.limit=Math.min(20,Math.max(1,Number(limit.value)||4)); else delete config.limit;
+    return {...old,id,type,enabled:card.querySelector('.section-enabled')?.checked!==false,order:index+1,config};
+  });
+}
+
+function addSection(){
+  if(!state.editingPage)return;
+  syncEditorSections(); state.editingPage.sections=[...(state.editingPage.sections||[]),sectionDefaults('welcome')]; state.editingPage.sections.forEach((section,index)=>section.order=index+1); renderEditorSections();
+}
+
+async function savePageEditor(event){
+  event.preventDefault();
+  if(!state.editingPage)return;
+  syncEditorSections();
+  state.editingPage.title=getValue('page-editor-title-input');
+  state.editingPage.slug=getValue('page-editor-slug') || '/';
+  state.editingPage.published=$('page-editor-published').checked;
+  const index=state.pages.findIndex(page=>page.id===state.editingPage.id);
+  if(index<0)return;
+  state.pages[index]=JSON.parse(JSON.stringify(state.editingPage));
+  try{ await saveDraft(); renderPages(); closePageEditor(); alert('Page berhasil disimpan sebagai draft.'); }
+  catch(error){ console.error(error); alert(error.message||'Gagal menyimpan page.'); }
+}
+
 async function publish(){
   await saveDraft();
   const result=await api('/publish',{method:'POST',body:'{}'});
@@ -95,6 +151,12 @@ function bindUI(){
   $('appearance-form')?.addEventListener('submit',async(e)=>{e.preventDefault();try{await saveDraft();alert('Draft website berhasil disimpan.');}catch(err){console.error(err);alert(err.message||'Gagal menyimpan draft.');}});
   $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(`${result.message||'Website berhasil dipublikasikan.'}${typeof result.eventCount==='number'?` Event publik: ${result.eventCount}.`:''}${typeof result.ministryCount==='number'?` Ministry publik: ${result.ministryCount}.`:''}`);}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
   $('preview-open')?.addEventListener('click',()=>{const href=$('website-public-link')?.href;if(href && href!=='#')window.open(href,'_blank','noopener');else alert('Website publik belum memiliki slug.');});
+  $('page-editor-close')?.addEventListener('click',closePageEditor);
+  $('page-editor-cancel')?.addEventListener('click',closePageEditor);
+  $('page-add-section')?.addEventListener('click',addSection);
+  $('page-editor-form')?.addEventListener('submit',savePageEditor);
+  $('page-editor-modal')?.addEventListener('click',(event)=>{if(event.target.id==='page-editor-modal')closePageEditor();});
+  document.addEventListener('keydown',(event)=>{if(event.key==='Escape' && !$('page-editor-modal')?.classList.contains('hidden'))closePageEditor();});
 }
 
 onAuthStateChanged(auth,async(user)=>{
