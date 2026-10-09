@@ -18,7 +18,7 @@ const $ = (id) => document.getElementById(id);
 const state = { slug: '', churchId: '', config: null, navigation: null, page: null, events: [] };
 
 function escapeHtml(value = '') {
-  return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+  return String(value).replace(/[&<>'\"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 }
 
 function slugFromPath() {
@@ -37,11 +37,12 @@ async function loadSite() {
   if (!state.churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${state.churchId}`;
-  const [configSnap, navSnap, homeSnap, eventsSnap] = await Promise.all([
+  const [configSnap, navSnap, homeSnap, eventsSnap, ministriesSnap] = await Promise.all([
     getDoc(doc(db, base, 'config/site')),
     getDoc(doc(db, base, 'navigation/main')),
     getDoc(doc(db, base, 'pages/home')),
-    getDocs(collection(db, base, 'events'))
+    getDocs(collection(db, base, 'events')),
+    getDocs(collection(db, base, 'ministries'))
   ]);
 
   if (!configSnap.exists() || configSnap.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
@@ -49,6 +50,7 @@ async function loadSite() {
   state.navigation = navSnap.exists() ? navSnap.data() : { items: [] };
   state.page = homeSnap.exists() ? homeSnap.data() : null;
   state.events = eventsSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  state.ministries = ministriesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
 }
 
 function formatEventDate(value) {
@@ -63,12 +65,28 @@ function formatEventTime(value) {
   return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
 
+function serviceCards(limit = 4) {
+  return state.events
+    .filter((event) => String(event.tipe || '').toLowerCase() === 'ibadah' && event.status !== 'completed')
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .slice(0, Math.max(1, Number(limit) || 4))
+    .map((event) => `<article class="service-card"><div class="service-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div><h3>${escapeHtml(event.nama || 'Ibadah')}</h3><p>${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</p></div></article>`)
+    .join('');
+}
+
 function eventCards(limit = 3) {
   return state.events
     .filter((event) => event.status !== 'completed')
     .sort((a, b) => new Date(a.start) - new Date(b.start))
     .slice(0, Math.max(1, Number(limit) || 3))
-    .map((event) => `<article class="event-card"><div class="event-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div class="event-card-body"><h3>${escapeHtml(event.nama || 'Event Gereja')}</h3><p>${escapeHtml(event.deskripsi || event.tipe || '')}</p><span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</span></div></article>`)
+    .map((event) => `<article class="event-card"><div class="event-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div class="event-card-body"><h3>${escapeHtml(event.nama || 'Event Gereja')}</h3><p>${escapeHtml(event.deskripsi || event.tipe || '')}</p><span>${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</span></div></article>`)
+    .join('');
+}
+
+function ministryCards(limit = 6) {
+  return state.ministries
+    .slice(0, Math.max(1, Number(limit) || 6))
+    .map((ministry) => `<article class="ministry-card"><h3>${escapeHtml(ministry.name || 'Pelayanan')}</h3><p>${escapeHtml(ministry.description || '')}</p>${ministry.leader?.name ? `<p><strong>Pemimpin:</strong> ${escapeHtml(ministry.leader.name)}</p>` : ''}${ministry.schedule ? `<p><strong>Jadwal:</strong> ${escapeHtml(ministry.schedule)}</p>` : ''}</article>`)
     .join('');
 }
 
@@ -80,14 +98,18 @@ function sectionHtml(section, config) {
       return `<section class="hero"><div class="container"><span class="eyebrow">${escapeHtml(config.siteName)}</span><h1>${escapeHtml(c.title || config.tagline || 'Selamat datang')}</h1><p>${escapeHtml(c.description || '')}</p></div></section>`;
     case 'welcome':
       return `<section class="section"><div class="container"><span class="eyebrow">WELCOME</span><h2>${escapeHtml(c.title || 'Selamat Datang')}</h2><p>${escapeHtml(c.description || 'Kami senang menyambut Anda di website gereja kami.')}</p></div></section>`;
-    case 'serviceSchedule':
-      return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${escapeHtml(c.title || 'Jadwal Ibadah')}</h2><div class="placeholder-grid"><article><strong>Minggu</strong><span>Jadwal ibadah akan ditampilkan di sini.</span></article></div></div></section>`;
+    case 'serviceSchedule': {
+      const cards = serviceCards(c.limit || 4);
+      return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${escapeHtml(c.title || 'Jadwal Ibadah')}</h2><div class="services-grid">${cards || '<p>Belum ada jadwal ibadah yang dipublikasikan.</p>'}</div></div></section>`;
+    }
     case 'featuredEvents': {
       const cards = eventCards(c.limit || 3);
       return `<section class="section"><div class="container"><span class="eyebrow">EVENT</span><h2>${escapeHtml(c.title || 'Event Terdekat')}</h2><div class="events-grid">${cards || '<p>Belum ada event yang dipublikasikan.</p>'}</div></div></section>`;
     }
-    case 'ministries':
-      return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${escapeHtml(c.title || 'Pelayanan')}</h2><p>${escapeHtml(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p></div></section>`;
+    case 'ministries': {
+      const cards = ministryCards(c.limit || 6);
+      return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${escapeHtml(c.title || 'Pelayanan')}</h2><p>${escapeHtml(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p><div class="ministries-grid">${cards || '<p>Belum ada pelayanan yang dipublikasikan.</p>'}</div></div></section>`;
+    }
     case 'contact':
       return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${escapeHtml(c.title || 'Hubungi Kami')}</h2><p>${escapeHtml(config.contact?.address || '')}</p><p>${escapeHtml(config.contact?.phone || '')}</p><p>${escapeHtml(config.contact?.email || '')}</p></div></section>`;
     default:
@@ -108,11 +130,11 @@ function render() {
 
   $('church-site').innerHTML = `
     <header class="site-header"><div class="container nav-wrap">
-      <a class="brand" href="/church/${encodeURIComponent(state.slug)}"><img class="brand-logo ${config.logoUrl ? '' : 'hidden'}" src="${escapeHtml(config.logoUrl)}" alt=""><span>${escapeHtml(config.siteName)}</span></a>
+      <a class="brand" href="/church/${encodeURIComponent(state.slug)}"><img class="brand-logo ${config.logoUrl ? '' : 'hidden'}" src="${escapeHtml(config.logoUrl)}" alt=""><span>${escapeHtml(config.siteName || 'Gereja')}</span></a>
       <nav>${nav.map(item => `<a href="${escapeHtml(item.target || '#')}">${escapeHtml(item.label)}</a>`).join('')}</nav>
     </div></header>
     <main>${sections.map(section => sectionHtml(section, config)).join('')}</main>
-    <footer class="site-footer"><div class="container"><strong>${escapeHtml(config.siteName)}</strong><span>${escapeHtml(config.tagline)}</span></div></footer>`;
+    <footer class="site-footer"><div class="container"><strong>${escapeHtml(config.siteName || 'Gereja')}</strong><span>${escapeHtml(config.tagline || '')}</span></div></footer>`;
 
   $('site-loading').classList.add('hidden');
   $('church-site').classList.remove('hidden');
