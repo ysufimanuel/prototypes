@@ -11,7 +11,7 @@ function hide(id){ $(id)?.classList.add('hidden'); }
 function setText(id,value){ const el=$(id); if(el) el.textContent=value ?? ''; }
 function setValue(id,value){ const el=$(id); if(el) el.value=value ?? ''; }
 function getValue(id){ return $(id)?.value?.trim() || ''; }
-function escapeHtml(value){ return String(value ?? '').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[m])); }
+function escapeHtml(value){ return String(value ?? '').replace(/[&<>\\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[m])); }
 
 async function api(path, options={}){
   if(!state.user) throw new Error('AUTH_REQUIRED');
@@ -83,8 +83,9 @@ async function publish(){
   await saveDraft();
   const result=await api('/publish',{method:'POST',body:'{}'});
   const eventsResult=await api('/publish-events',{method:'POST',body:'{}'});
+  const groupsResult=await api('/publish-groups',{method:'POST',body:'{}'});
   await loadDraft();
-  return {...result,eventCount:eventsResult.eventCount};
+  return {...result,eventCount:eventsResult.eventCount,ministryCount:groupsResult.ministryCount};
 }
 
 function bindUI(){
@@ -92,7 +93,7 @@ function bindUI(){
   document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>switchSection(btn.dataset.go)));
   $('website-logout')?.addEventListener('click',async()=>{await firebaseLogout();});
   $('appearance-form')?.addEventListener('submit',async(e)=>{e.preventDefault();try{await saveDraft();alert('Draft website berhasil disimpan.');}catch(err){console.error(err);alert(err.message||'Gagal menyimpan draft.');}});
-  $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(`${result.message||'Website berhasil dipublikasikan.'}${typeof result.eventCount==='number'?` Event publik: ${result.eventCount}.`:''}`);}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
+  $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(`${result.message||'Website berhasil dipublikasikan.'}${typeof result.eventCount==='number'?` Event publik: ${result.eventCount}.`:''}${typeof result.ministryCount==='number'?` Ministry publik: ${result.ministryCount}.`:''}`);}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
   $('preview-open')?.addEventListener('click',()=>{const href=$('website-public-link')?.href;if(href && href!=='#')window.open(href,'_blank','noopener');else alert('Website publik belum memiliki slug.');});
 }
 
