@@ -1,30 +1,30 @@
-import { db } from '../firebase.js';
-import { doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
 const root = document.getElementById('church-site');
 const loading = document.getElementById('site-loading');
 const errorBox = document.getElementById('site-error');
 const esc = (v = '') => String(v).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const slug = decodeURIComponent((location.pathname.split('/').filter(Boolean).find((p, i, a) => p === 'church' && a[i + 1]) && location.pathname.split('/').filter(Boolean)[location.pathname.split('/').filter(Boolean).indexOf('church') + 1]) || '');
+const parts = location.pathname.split('/').filter(Boolean);
+const churchIndex = parts.indexOf('church');
+const slug = churchIndex >= 0 ? decodeURIComponent(parts[churchIndex + 1] || '') : '';
 
 function card(title, body) {
   return `<article class="public-card"><h3>${esc(title)}</h3>${body}</article>`;
 }
 
 async function main() {
-  if (!slug) throw new Error('SITE_NOT_FOUND');
-  const slugDoc = await getDoc(doc(db, 'siteSlugs', slug));
+  if (!slug || !window.db || !window.firebaseDoc || !window.firebaseGetDoc || !window.firebaseCollection || !window.firebaseGetDocs) throw new Error('SITE_NOT_FOUND');
+  const db = window.db;
+  const slugDoc = await window.firebaseGetDoc(window.firebaseDoc(db, 'siteSlugs', slug));
   if (!slugDoc.exists()) throw new Error('SITE_NOT_FOUND');
   const churchId = slugDoc.data().churchId;
   if (!churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${churchId}`;
   const [configDoc, navDoc, pageDoc, eventsSnap, ministriesSnap] = await Promise.all([
-    getDoc(doc(db, base, 'config/site')),
-    getDoc(doc(db, base, 'navigation/main')),
-    getDoc(doc(db, base, 'pages/home')),
-    getDocs(collection(db, base, 'events')),
-    getDocs(collection(db, base, 'ministries'))
+    window.firebaseGetDoc(window.firebaseDoc(db, base, 'config/site')),
+    window.firebaseGetDoc(window.firebaseDoc(db, base, 'navigation/main')),
+    window.firebaseGetDoc(window.firebaseDoc(db, base, 'pages/home')),
+    window.firebaseGetDocs(window.firebaseCollection(db, base, 'events')),
+    window.firebaseGetDocs(window.firebaseCollection(db, base, 'ministries'))
   ]);
   if (!configDoc.exists() || configDoc.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
 
