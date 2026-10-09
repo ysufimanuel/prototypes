@@ -1,15 +1,26 @@
-import { auth, db, getActiveChurchId, logout as firebaseLogout } from '../firebase.js';
-import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { auth, db, logout as firebaseLogout } from '../firebase.js';
+import { onAuthStateChanged, getIdToken } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { user:null, profile:null, churchId:null };
+const state = { user:null, profile:null, churchId:null, church:null, config:null, navigation:null, pages:[] };
+const API_BASE = '/api/admin/website';
 
 function show(id){ $(id)?.classList.remove('hidden'); }
 function hide(id){ $(id)?.classList.add('hidden'); }
 function setText(id,value){ const el=$(id); if(el) el.textContent=value ?? ''; }
 function setValue(id,value){ const el=$(id); if(el) el.value=value ?? ''; }
 function getValue(id){ return $(id)?.value?.trim() || ''; }
+function escapeHtml(value){ return String(value ?? '').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\\':'&#92;','"':'&quot;'}[m])); }
+
+async function api(path, options={}){
+  if(!state.user) throw new Error('AUTH_REQUIRED');
+  const token=await getIdToken(state.user,true);
+  const response=await fetch(`${API_BASE}${path}`,{...options,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`,...(options.headers||{})}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok || data.success===false) throw new Error(data.message || `HTTP ${response.status}`);
+  return data;
+}
 
 function switchSection(section){
   document.querySelectorAll('.website-section').forEach(el=>el.classList.toggle('active',el.dataset.panel===section));
@@ -17,22 +28,30 @@ function switchSection(section){
 }
 
 function renderPages(){
-  const pages=[
-    ['home','Home','Hero, welcome, jadwal ibadah, dan konten utama'],
-    ['new-to-church','New to Church','Informasi untuk pengunjung baru'],
-    ['connect','Connect','Cara terhubung dengan gereja'],
-    ['grow','Grow','Pertumbuhan iman dan resources'],
-    ['ministries','Ministries','Pelayanan dan ministry gereja'],
-    ['resources','Resources','Sermon, media, dan materi'],
-  ];
   const el=$('website-pages-list'); if(!el)return;
-  el.innerHTML=pages.map(([id,title,desc])=>`<div class="page-item"><div class="page-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${title}</strong><small>${desc}</small></div></div><button class="website-btn secondary" type="button" data-page="${id}">Edit</button></div>`).join('');
+  el.innerHTML=state.pages.map(page=>`<div class="page-item"><div class="page-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${escapeHtml(page.title)}</strong><small>${escapeHtml(page.slug)}</small></div></div><button class="website-btn secondary" type="button" data-page="${escapeHtml(page.id)}">Edit</button></div>`).join('');
 }
 
 function renderNavigation(){
-  const items=[['home','Home','/'],['new-to-church','New to Church','/new-to-church'],['connect','Connect','/connect'],['grow','Grow','/grow'],['ministries','Ministries','/ministries'],['resources','Resources','/resources']];
   const el=$('website-navigation-list'); if(!el)return;
-  el.innerHTML=items.map(([id,title,target])=>`<div class="navigation-item"><div class="navigation-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${title}</strong><small>${target}</small></div></div><label><input type="checkbox" checked data-nav="${id}"> Visible</label></div>`).join('');
+  const items=state.navigation?.items || [];
+  el.innerHTML=items.map(item=>`<div class="navigation-item"><div class="navigation-item-main"><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.target)}</small></div></div><label><input type="checkbox" ${item.visible!==false?'checked':''} data-nav="${escapeHtml(item.id)}"> Visible</label></div>`).join('');
+}
+
+function renderAppearance(){
+  const c=state.config||{}, t=c.theme||{}, contact=c.contact||{};
+  setValue('site-name',c.siteName); setValue('site-tagline',c.tagline); setValue('site-logo',c.logoUrl); setValue('site-favicon',c.faviconUrl);
+  setValue('theme-primary',t.primary); setValue('theme-secondary',t.secondary); setValue('theme-accent',t.accent); setValue('theme-heading-font',t.headingFont);
+  setValue('contact-email',contact.email); setValue('contact-phone',contact.phone); setValue('contact-address',contact.address); setValue('contact-maps',contact.mapsUrl);
+}
+
+function renderOverview(){
+  const website=state.church?.website||{}, status=state.config?.status || website.status || 'draft', slug=website.slug;
+  setText('overview-status',status==='published'?'Published':'Draft');
+  setText('overview-published-at',state.config?.publishedAt?'Sudah dipublikasikan':'Belum pernah dipublikasikan');
+  setText('website-church-name',state.church?.name || state.config?.siteName || 'Gereja Digital');
+  if(slug){ const url=`/church/${encodeURIComponent(slug)}`; const link=$('website-public-link'); link.href=url; link.classList.remove('disabled'); setText('overview-url',url); const frame=$('website-preview-frame'); if(frame) frame.src=url; }
+  else { setText('overview-url','Slug belum tersedia'); }
 }
 
 async function loadProfile(user){
@@ -44,32 +63,44 @@ async function loadProfile(user){
   state.user=user; state.profile=profile; state.churchId=profile.churchId;
 }
 
-function renderProfile(){
-  setText('website-church-name',state.profile?.churchName || 'Gereja Digital');
-  const slug=state.profile?.churchSlug;
-  if(slug){
-    const url=`/church/${encodeURIComponent(slug)}`;
-    const link=$('website-public-link'); link.href=url; link.classList.remove('disabled');
-    setText('overview-url',url);
-  }else{
-    setText('overview-url','Slug belum tersedia');
-  }
+async function loadDraft(){
+  const result=await api('/draft');
+  state.church=result.data.church||{}; state.config=result.data.config||{}; state.navigation=result.data.navigation||{items:[]}; state.pages=result.data.pages||[];
+  renderOverview(); renderAppearance(); renderPages(); renderNavigation();
+}
+
+async function provision(){ await api('/provision',{method:'POST',body:'{}'}); await loadDraft(); }
+
+async function saveDraft(){
+  const navigation={items:(state.navigation?.items||[]).map(item=>({...item,visible:document.querySelector(`[data-nav="${CSS.escape(item.id)}"]`)?.checked!==false}))};
+  const config={...state.config,siteName:getValue('site-name'),tagline:getValue('site-tagline'),logoUrl:getValue('site-logo'),faviconUrl:getValue('site-favicon'),theme:{...(state.config?.theme||{}),primary:getValue('theme-primary'),secondary:getValue('theme-secondary'),accent:getValue('theme-accent'),headingFont:getValue('theme-heading-font')||'Poppins'},contact:{email:getValue('contact-email'),phone:getValue('contact-phone'),address:getValue('contact-address'),mapsUrl:getValue('contact-maps')}};
+  const result=await api('/draft',{method:'PUT',body:JSON.stringify({config,navigation,pages:state.pages})});
+  state.config={...state.config,...config}; state.navigation=navigation;
+  renderOverview(); return result;
+}
+
+async function publish(){
+  await saveDraft();
+  const result=await api('/publish',{method:'POST',body:'{}'});
+  await loadDraft();
+  return result;
 }
 
 function bindUI(){
   document.querySelectorAll('.website-nav').forEach(btn=>btn.addEventListener('click',()=>switchSection(btn.dataset.section)));
   document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>switchSection(btn.dataset.go)));
   $('website-logout')?.addEventListener('click',async()=>{await firebaseLogout();});
-  $('appearance-form')?.addEventListener('submit',(e)=>{e.preventDefault(); alert('Draft Appearance siap disimpan. Backend website akan kita sambungkan pada tahap berikutnya.');});
-  $('website-publish-sidebar')?.addEventListener('click',()=>alert('Publish backend akan kita aktifkan setelah struktur draft selesai.'));
-  $('preview-open')?.addEventListener('click',()=>{$('website-public-link')?.click();});
+  $('appearance-form')?.addEventListener('submit',async(e)=>{e.preventDefault();try{await saveDraft();alert('Draft website berhasil disimpan.');}catch(err){console.error(err);alert(err.message||'Gagal menyimpan draft.');}});
+  $('website-publish-sidebar')?.addEventListener('click',async()=>{try{const result=await publish();alert(result.message||'Website berhasil dipublikasikan.');}catch(err){console.error(err);alert(err.message||'Gagal mempublikasikan website.');}});
+  $('preview-open')?.addEventListener('click',()=>{const href=$('website-public-link')?.href;if(href && href!=='#')window.open(href,'_blank','noopener');else alert('Website publik belum memiliki slug.');});
 }
 
 onAuthStateChanged(auth,async(user)=>{
   try{
-    if(!user){ window.location.href='index.html'; return; }
+    if(!user){window.location.href='index.html';return;}
     await loadProfile(user);
-    renderProfile(); renderPages(); renderNavigation(); bindUI();
+    await provision();
+    bindUI();
     hide('website-loading'); show('website-manager');
   }catch(err){
     console.error('[WEBSITE] access check failed:',err);
