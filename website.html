@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ff6b00">
+    <title>Website Manager - Church Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/website/website.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="website-manager-body">
+    <div id="website-loading" class="website-loading"><i class="fas fa-spinner fa-spin"></i><span>Memuat Website Manager...</span></div>
+    <div id="website-access-denied" class="website-state hidden"><i class="fas fa-lock"></i><h1>Akses Ditolak</h1><p>Hanya Admin dan Super Admin yang dapat mengelola website gereja.</p><a href="index.html" class="website-btn secondary"><i class="fas fa-arrow-left"></i> Kembali ke CMS</a></div>
+    <div id="website-manager" class="website-manager hidden">
+        <header class="website-topbar">
+            <div class="website-brand"><a href="index.html" class="back-cms" title="Kembali ke CMS"><i class="fas fa-arrow-left"></i></a><div class="website-brand-icon"><i class="fas fa-globe"></i></div><div><strong>Website Manager</strong><small id="website-church-name">Gereja Digital</small></div></div>
+            <div class="website-top-actions"><a id="website-public-link" class="website-btn secondary disabled" href="#" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i><span>Website</span></a><button id="website-logout" class="icon-btn" type="button" title="Logout"><i class="fas fa-sign-out-alt"></i></button></div>
+        </header>
+        <div class="website-layout">
+            <aside class="website-sidebar">
+                <nav aria-label="Website Manager">
+                    <button class="website-nav active" data-section="overview"><i class="fas fa-chart-line"></i><span>Overview</span></button>
+                    <button class="website-nav" data-section="pages"><i class="fas fa-file-alt"></i><span>Pages</span></button>
+                    <button class="website-nav" data-section="navigation"><i class="fas fa-bars"></i><span>Navigation</span></button>
+                    <button class="website-nav" data-section="appearance"><i class="fas fa-palette"></i><span>Appearance</span></button>
+                    <button class="website-nav" data-section="preview"><i class="fas fa-eye"></i><span>Preview</span></button>
+                </nav>
+                <div class="website-sidebar-bottom"><button id="website-publish-sidebar" class="website-publish-btn" type="button"><i class="fas fa-cloud-upload-alt"></i><span>Publish Changes</span></button></div>
+            </aside>
+            <main class="website-main">
+                <section class="website-section active" data-panel="overview">
+                    <div class="section-heading"><div><span class="eyebrow">WEBSITE</span><h1>Website Gereja</h1><p>Kelola tampilan dan konten website publik gereja Anda.</p></div><div id="website-status-badge" class="status-badge draft"><span></span> Draft</div></div>
+                    <div class="website-grid overview-grid">
+                        <article class="website-card status-card"><div class="card-icon"><i class="fas fa-globe"></i></div><div><span>Status Publikasi</span><strong id="overview-status">Draft</strong><small id="overview-published-at">Belum pernah dipublikasikan</small></div></article>
+                        <article class="website-card"><div class="card-icon"><i class="fas fa-link"></i></div><div><span>Alamat Website</span><strong id="overview-url">Belum tersedia</strong><small>URL publik gereja</small></div></article>
+                    </div>
+                    <div class="website-card quick-card"><div class="card-header"><div><h2>Mulai Mengelola</h2><p>Atur halaman, navigasi, dan identitas visual website.</p></div></div><div class="quick-grid">
+                        <button class="quick-item" data-go="pages"><i class="fas fa-file-alt"></i><strong>Pages</strong><span>Kelola halaman website</span></button>
+                        <button class="quick-item" data-go="navigation"><i class="fas fa-bars"></i><strong>Navigation</strong><span>Atur menu publik</span></button>
+                        <button class="quick-item" data-go="appearance"><i class="fas fa-palette"></i><strong>Appearance</strong><span>Logo, warna, dan kontak</span></button>
+                        <button class="quick-item" data-go="preview"><i class="fas fa-eye"></i><strong>Preview</strong><span>Lihat sebelum publish</span></button>
+                    </div></div>
+                </section>
+                <section class="website-section" data-panel="pages"><div class="section-heading"><div><span class="eyebrow">CONTENT</span><h1>Pages</h1><p>Susun halaman menggunakan section yang sudah disiapkan.</p></div></div><div id="website-pages-list" class="page-list"></div></section>
+                <section class="website-section" data-panel="navigation"><div class="section-heading"><div><span class="eyebrow">STRUCTURE</span><h1>Navigation</h1><p>Atur menu yang tampil di website publik.</p></div></div><div class="website-card"><div id="website-navigation-list" class="navigation-list"></div></div></section>
+                <section class="website-section" data-panel="appearance"><div class="section-heading"><div><span class="eyebrow">DESIGN</span><h1>Appearance</h1><p>Atur identitas dasar website gereja.</p></div></div>
+                    <form id="appearance-form" class="website-card appearance-form">
+                        <div class="form-section"><h2>Identitas</h2><div class="form-grid"><label>Nama Website<input id="site-name" type="text" maxlength="120"></label><label>Tagline<input id="site-tagline" type="text" maxlength="180"></label><label>Logo URL<input id="site-logo" type="url" placeholder="https://..."></label><label>Favicon URL<input id="site-favicon" type="url" placeholder="https://..."></label></div></div>
+                        <div class="form-section"><h2>Theme</h2><div class="form-grid"><label>Primary Color<input id="theme-primary" type="text" placeholder="#ff6b00"></label><label>Secondary Color<input id="theme-secondary" type="text" placeholder="#1f2937"></label><label>Accent Color<input id="theme-accent" type="text" placeholder="#f59e0b"></label><label>Heading Font<input id="theme-heading-font" type="text" placeholder="Poppins"></label></div></div>
+                        <div class="form-section"><h2>Kontak</h2><div class="form-grid"><label>Email<input id="contact-email" type="email"></label><label>Telepon<input id="contact-phone" type="tel"></label><label class="full">Alamat<input id="contact-address" type="text"></label><label class="full">Google Maps URL<input id="contact-maps" type="url" placeholder="https://maps.google.com/..."></label></div></div>
+                        <div class="form-actions"><button class="website-btn primary" type="submit"><i class="fas fa-save"></i> Simpan Draft</button></div>
+                    </form>
+                </section>
+                <section class="website-section" data-panel="preview"><div class="section-heading"><div><span class="eyebrow">PREVIEW</span><h1>Preview</h1><p>Pratinjau website publik sebelum perubahan dipublikasikan.</p></div></div><div class="preview-shell"><div class="preview-toolbar"><span><i class="fas fa-circle"></i> Draft Preview</span><button id="preview-open" class="website-btn secondary" type="button"><i class="fas fa-external-link-alt"></i> Buka Preview</button></div><iframe id="website-preview-frame" title="Website preview" src="about:blank"></iframe></div></section>
+            </main>
+        </div>
+        <div class="website-mobile-bottom"><button class="website-nav active" data-section="overview"><i class="fas fa-chart-line"></i><span>Overview</span></button><button class="website-nav" data-section="pages"><i class="fas fa-file-alt"></i><span>Pages</span></button><button class="website-nav" data-section="appearance"><i class="fas fa-palette"></i><span>Design</span></button><button class="website-nav" data-section="preview"><i class="fas fa-eye"></i><span>Preview</span></button></div>
+    </div>
+    <script type="module" src="js/website/website.js"></script>
+</body>
+</html>
