@@ -54,7 +54,7 @@ function renderOverview(){
   setText('overview-status',status==='published'?'Published':'Draft');
   setText('overview-published-at',state.config?.publishedAt?'Sudah dipublikasikan':'Belum pernah dipublikasikan');
   setText('website-church-name',state.church?.name || state.config?.siteName || 'Gereja Digital');
-  if(slug){ const url=`/church/${encodeURIComponent(slug)}`; const link=$('website-public-link'); link.href=url; link.classList.remove('disabled'); setText('overview-url',url); const frame=$('website-preview-frame'); if(frame) frame.src=url; }
+  if(slug){ const url=`/church/${encodeURIComponent(slug)}`; const link=$('website-public-link'); link.href=url; link.classList.remove('disabled'); setText('overview-url',url); }
   else { setText('overview-url','Slug belum tersedia'); }
 }
 
@@ -80,7 +80,9 @@ async function saveDraft(){
   const config={...state.config,siteName:getValue('site-name'),tagline:getValue('site-tagline'),logoUrl:getValue('site-logo'),faviconUrl:getValue('site-favicon'),theme:{...(state.config?.theme||{}),primary:getValue('theme-primary'),secondary:getValue('theme-secondary'),accent:getValue('theme-accent'),headingFont:getValue('theme-heading-font')||'Poppins'},contact:{email:getValue('contact-email'),phone:getValue('contact-phone'),address:getValue('contact-address'),mapsUrl:getValue('contact-maps')}};
   const result=await api('/draft',{method:'PUT',body:JSON.stringify({config,navigation,pages:state.pages})});
   state.config={...state.config,...config}; state.navigation=navigation;
-  renderOverview(); return result;
+  renderOverview();
+  window.dispatchEvent(new CustomEvent('cms:website-draft-updated'));
+  return result;
 }
 
 function openPageEditor(pageId){
