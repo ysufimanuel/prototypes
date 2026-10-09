@@ -52,7 +52,7 @@
                         <div class="form-actions"><button class="website-btn primary" type="submit"><i class="fas fa-save"></i> Simpan Draft</button></div>
                     </form>
                 </section>
-                <section class="website-section" data-panel="preview"><div class="section-heading"><div><span class="eyebrow">PREVIEW</span><h1>Preview</h1><p>Pratinjau website publik sebelum perubahan dipublikasikan.</p></div></div><div class="preview-shell"><div class="preview-toolbar"><span><i class="fas fa-circle"></i> Draft Preview</span><button id="preview-open" class="website-btn secondary" type="button"><i class="fas fa-external-link-alt"></i> Buka Preview</button></div><iframe id="website-preview-frame" title="Website preview" src="about:blank"></iframe></div></section>
+                <section class="website-section" data-panel="preview"><div class="section-heading"><div><span class="eyebrow">PREVIEW</span><h1>Preview</h1><p>Pratinjau draft website sebelum perubahan dipublikasikan.</p></div></div><div class="preview-shell"><div class="preview-toolbar"><span><i class="fas fa-circle"></i> Draft Preview</span><button id="preview-refresh" class="website-btn secondary" type="button"><i class="fas fa-sync-alt"></i> Refresh Draft</button><button id="preview-open" class="website-btn secondary" type="button"><i class="fas fa-external-link-alt"></i> Buka Preview</button></div><iframe id="website-preview-frame" title="Website draft preview" src="about:blank"></iframe></div></section>
             </main>
         </div>
         <div class="website-mobile-bottom"><button class="website-nav active" data-section="overview"><i class="fas fa-chart-line"></i><span>Overview</span></button><button class="website-nav" data-section="pages"><i class="fas fa-file-alt"></i><span>Pages</span></button><button class="website-nav" data-section="appearance"><i class="fas fa-palette"></i><span>Design</span></button><button class="website-nav" data-section="preview"><i class="fas fa-eye"></i><span>Preview</span></button></div>
@@ -72,5 +72,6 @@
         </div>
     </div>
     <script type="module" src="js/website/website.js"></script>
+    <script type="module" src="js/website/website-preview-manager.js"></script>
 </body>
 </html>
