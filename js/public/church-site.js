@@ -1,22 +1,21 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDUMMY',
-  authDomain: 'cms-v6.firebaseapp.com',
-  projectId: 'cms-v6',
-  storageBucket: 'cms-v6.appspot.com',
-  messagingSenderId: '000000000000',
-  appId: '1:000000000000:web:000000000000'
+  apiKey: 'AIzaSyBOyT_6Klad5P34gq-VbsY6gVqWYAnwiyE',
+  authDomain: 'churchmanagementsystem-a77a3.firebaseapp.com',
+  projectId: 'churchmanagementsystem-a77a3',
+  storageBucket: 'churchmanagementsystem-a77a3.firebasestorage.app',
+  messagingSenderId: '369150207272',
+  appId: '1:369150207272:web:0c9c3251c6c4300e0f5c1d',
+  measurementId: 'G-XWR9DH5Q0G'
 };
 
-// This file is intentionally isolated from the private CMS Firebase client.
-// Replace the config above with the project's existing public Firebase config.
 const app = initializeApp(firebaseConfig, 'public-site');
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
-const state = { slug: '', churchId: '', config: null, navigation: null, pages: [] };
+const state = { slug: '', churchId: '', config: null, navigation: null, page: null };
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -24,8 +23,8 @@ function escapeHtml(value = '') {
 
 function slugFromPath() {
   const parts = window.location.pathname.split('/').filter(Boolean);
-  const churchIndex = parts.indexOf('church');
-  return churchIndex >= 0 ? decodeURIComponent(parts[churchIndex + 1] || '') : '';
+  const index = parts.indexOf('church');
+  return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
 }
 
 async function loadSite() {
@@ -38,7 +37,7 @@ async function loadSite() {
   if (!state.churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${state.churchId}`;
-  const [configSnap, navSnap, pagesSnap] = await Promise.all([
+  const [configSnap, navSnap, homeSnap] = await Promise.all([
     getDoc(doc(db, base, 'config/site')),
     getDoc(doc(db, base, 'navigation/main')),
     getDoc(doc(db, base, 'pages/home'))
@@ -47,7 +46,7 @@ async function loadSite() {
   if (!configSnap.exists() || configSnap.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
   state.config = configSnap.data();
   state.navigation = navSnap.exists() ? navSnap.data() : { items: [] };
-  state.pages = pagesSnap.exists() ? [pagesSnap.data()] : [];
+  state.page = homeSnap.exists() ? homeSnap.data() : null;
 }
 
 function sectionHtml(section, config) {
@@ -80,8 +79,7 @@ function render() {
   document.documentElement.style.setProperty('--accent', config.theme?.accent || '#f59e0b');
 
   const nav = (state.navigation.items || []).filter(item => item.visible !== false);
-  const page = state.pages.find(item => item.slug === '/') || state.pages[0];
-  const sections = (page?.sections || []).filter(s => s.enabled !== false).sort((a,b) => (a.order || 0) - (b.order || 0));
+  const sections = (state.page?.sections || []).filter(s => s.enabled !== false).sort((a,b) => (a.order || 0) - (b.order || 0));
 
   $('church-site').innerHTML = `
     <header class="site-header"><div class="container nav-wrap">
@@ -95,12 +93,8 @@ function render() {
   $('church-site').classList.remove('hidden');
 }
 
-function showError() {
-  $('site-loading').classList.add('hidden');
-  $('site-error').classList.remove('hidden');
-}
-
 loadSite().then(render).catch((error) => {
   console.error('[PUBLIC WEBSITE]', error);
-  showError();
+  $('site-loading').classList.add('hidden');
+  $('site-error').classList.remove('hidden');
 });
