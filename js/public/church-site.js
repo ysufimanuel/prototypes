@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
-import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBOyT_6Klad5P34gq-VbsY6gVqWYAnwiyE',
@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig, 'public-site');
 const db = getFirestore(app);
 
 const $ = (id) => document.getElementById(id);
-const state = { slug: '', churchId: '', config: null, navigation: null, page: null };
+const state = { slug: '', churchId: '', config: null, navigation: null, page: null, events: [] };
 
 function escapeHtml(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
@@ -37,16 +37,39 @@ async function loadSite() {
   if (!state.churchId) throw new Error('SITE_INVALID');
 
   const base = `publicSites/${state.churchId}`;
-  const [configSnap, navSnap, homeSnap] = await Promise.all([
+  const [configSnap, navSnap, homeSnap, eventsSnap] = await Promise.all([
     getDoc(doc(db, base, 'config/site')),
     getDoc(doc(db, base, 'navigation/main')),
-    getDoc(doc(db, base, 'pages/home'))
+    getDoc(doc(db, base, 'pages/home')),
+    getDocs(collection(db, base, 'events'))
   ]);
 
   if (!configSnap.exists() || configSnap.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
   state.config = configSnap.data();
   state.navigation = navSnap.exists() ? navSnap.data() : { items: [] };
   state.page = homeSnap.exists() ? homeSnap.data() : null;
+  state.events = eventsSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+}
+
+function formatEventDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatEventTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function eventCards(limit = 3) {
+  return state.events
+    .filter((event) => event.status !== 'completed')
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .slice(0, Math.max(1, Number(limit) || 3))
+    .map((event) => `<article class="event-card"><div class="event-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div class="event-card-body"><h3>${escapeHtml(event.nama || 'Event Gereja')}</h3><p>${escapeHtml(event.deskripsi || event.tipe || '')}</p><span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</span></div></article>`)
+    .join('');
 }
 
 function sectionHtml(section, config) {
@@ -59,8 +82,10 @@ function sectionHtml(section, config) {
       return `<section class="section"><div class="container"><span class="eyebrow">WELCOME</span><h2>${escapeHtml(c.title || 'Selamat Datang')}</h2><p>${escapeHtml(c.description || 'Kami senang menyambut Anda di website gereja kami.')}</p></div></section>`;
     case 'serviceSchedule':
       return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${escapeHtml(c.title || 'Jadwal Ibadah')}</h2><div class="placeholder-grid"><article><strong>Minggu</strong><span>Jadwal ibadah akan ditampilkan di sini.</span></article></div></div></section>`;
-    case 'featuredEvents':
-      return `<section class="section"><div class="container"><span class="eyebrow">EVENT</span><h2>${escapeHtml(c.title || 'Event Terdekat')}</h2><div class="placeholder-grid"><article><strong>Event Gereja</strong><span>Data event publik akan terhubung pada tahap berikutnya.</span></article></div></div></section>`;
+    case 'featuredEvents': {
+      const cards = eventCards(c.limit || 3);
+      return `<section class="section"><div class="container"><span class="eyebrow">EVENT</span><h2>${escapeHtml(c.title || 'Event Terdekat')}</h2><div class="events-grid">${cards || '<p>Belum ada event yang dipublikasikan.</p>'}</div></div></section>`;
+    }
     case 'ministries':
       return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${escapeHtml(c.title || 'Pelayanan')}</h2><p>${escapeHtml(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p></div></section>`;
     case 'contact':
