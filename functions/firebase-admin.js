@@ -1,23 +1,14 @@
-const { initializeApp, getApps } = require("firebase-admin/app");
+const admin = require("firebase-admin");
 
-const { getAuth } = require("firebase-admin/auth");
+const app = admin.apps.length > 0 ? admin.app() : admin.initializeApp();
 
-const { getFirestore } = require("firebase-admin/firestore");
-
-const app = getApps().length > 0 ? getApps()[0] : initializeApp();
-
-const auth = getAuth(app);
-
-const db = getFirestore(app);
+const auth = admin.auth();
+const db = admin.firestore();
 
 console.log("Firebase Admin initialized");
 
 module.exports = {
-  admin: {
-    app,
-    auth,
-    db,
-  },
+  admin,
   db,
   auth,
 };
