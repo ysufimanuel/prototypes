@@ -1,25 +1,20 @@
-const { describe, test, after } = require('node:test');
+const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('node:http');
 
-const appCheckModule = require('firebase-admin/app-check');
-const originalGetAppCheck = appCheckModule.getAppCheck;
+const { createAppCheckMiddleware } = require('../functions/app-check-middleware');
 
-appCheckModule.getAppCheck = () => ({
-  verifyToken: async (token) => {
-    if (token === 'test-valid-app-check-token') {
-      return { appId: 'test-app-id', aud: ['projects/test-project/apps/test-app'] };
-    }
-    throw new Error('invalid App Check token');
-  },
-});
-
-const { requireAppCheck } = require('../functions/app-check-middleware');
+const testVerifyToken = async (token) => {
+  if (token === 'test-valid-app-check-token') {
+    return { appId: 'test-app-id', aud: ['projects/test-project/apps/test-app'] };
+  }
+  throw new Error('invalid App Check token');
+};
 
 function makeServer() {
   const app = express();
-  app.get('/protected', requireAppCheck, (req, res) => {
+  app.get('/protected', createAppCheckMiddleware({ verifyToken: testVerifyToken }), (req, res) => {
     res.json({ success: true, appId: req.appCheck?.appId || null });
   });
   return http.createServer(app);
@@ -35,10 +30,6 @@ async function request(server, token) {
 
 describe('App Check middleware', () => {
   let server;
-
-  after(() => {
-    appCheckModule.getAppCheck = originalGetAppCheck;
-  });
 
   test('disabled App Check allows request for local/default mode', async () => {
     delete process.env.APP_CHECK_ENFORCED;
