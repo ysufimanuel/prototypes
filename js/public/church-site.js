@@ -1,0 +1,181 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyBOyT_6Klad5P34gq-VbsY6gVqWYAnwiyE',
+  authDomain: 'churchmanagementsystem-a77a3.firebaseapp.com',
+  projectId: 'churchmanagementsystem-a77a3',
+  storageBucket: 'churchmanagementsystem-a77a3.firebasestorage.app',
+  messagingSenderId: '369150207272',
+  appId: '1:369150207272:web:0c9c3251c6c4300e0f5c1d',
+  measurementId: 'G-XWR9DH5Q0G'
+};
+
+const app = initializeApp(firebaseConfig, 'public-site');
+const db = getFirestore(app);
+
+const $ = (id) => document.getElementById(id);
+const state = { slug: '', churchId: '', route: '/', config: null, navigation: null, page: null, events: [], ministries: [] };
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'\"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+}
+
+function slugFromPath() {
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const index = parts.indexOf('church');
+  return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
+}
+
+function routeFromPath(slug) {
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const prefix = `/church/${encodeURIComponent(slug)}`;
+  if (pathname === prefix || pathname === `${prefix}/`) return '/';
+  if (pathname.startsWith(`${prefix}/`)) {
+    const route = pathname.slice(prefix.length) || '/';
+    return `/${decodeURIComponent(route.replace(/^\/+/, ''))}`;
+  }
+  return '/';
+}
+
+function normalizePageSlug(value = '') {
+  const slug = String(value || '/').trim();
+  if (!slug || slug === '/') return '/';
+  return `/${slug.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+}
+
+function publicUrl(target = '/') {
+  const route = normalizePageSlug(target);
+  return route === '/' ? `/church/${encodeURIComponent(state.slug)}` : `/church/${encodeURIComponent(state.slug)}${route}`;
+}
+
+async function loadSite() {
+  state.slug = slugFromPath();
+  if (!state.slug) throw new Error('SLUG_MISSING');
+  state.route = routeFromPath(state.slug);
+
+  const slugSnap = await getDoc(doc(db, 'siteSlugs', state.slug));
+  if (!slugSnap.exists()) throw new Error('SITE_NOT_FOUND');
+  state.churchId = slugSnap.data().churchId;
+  if (!state.churchId) throw new Error('SITE_INVALID');
+
+  const base = `publicSites/${state.churchId}`;
+  const [configSnap, navSnap, pagesSnap, eventsSnap, ministriesSnap] = await Promise.all([
+    getDoc(doc(db, base, 'config/site')),
+    getDoc(doc(db, base, 'navigation/main')),
+    getDocs(collection(db, base, 'pages')),
+    getDocs(collection(db, base, 'events')),
+    getDocs(collection(db, base, 'ministries'))
+  ]);
+
+  if (!configSnap.exists() || configSnap.data().enabled === false) throw new Error('SITE_UNPUBLISHED');
+  state.config = configSnap.data();
+  state.navigation = navSnap.exists() ? navSnap.data() : { items: [] };
+  state.events = eventsSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  state.ministries = ministriesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+
+  const pages = pagesSnap.docs.map((snap) => ({ id: snap.id, ...snap.data() }));
+  state.page = pages.find((page) => normalizePageSlug(page.slug) === state.route);
+  if (!state.page || state.page.published === false) throw new Error('PAGE_NOT_FOUND');
+}
+
+function formatEventDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatEventTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function serviceCards(limit = 4) {
+  return state.events
+    .filter((event) => String(event.tipe || '').toLowerCase() === 'ibadah' && event.status !== 'completed')
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .slice(0, Math.max(1, Number(limit) || 4))
+    .map((event) => `<article class="service-card"><div class="service-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div><h3>${escapeHtml(event.nama || 'Ibadah')}</h3><p>${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</p></div></article>`)
+    .join('');
+}
+
+function eventCards(limit = 3) {
+  return state.events
+    .filter((event) => event.status !== 'completed')
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .slice(0, Math.max(1, Number(limit) || 3))
+    .map((event) => `<article class="event-card"><div class="event-card-date"><strong>${escapeHtml(formatEventDate(event.start))}</strong><span>${escapeHtml(formatEventTime(event.start))}</span></div><div class="event-card-body"><h3>${escapeHtml(event.nama || 'Event Gereja')}</h3><p>${escapeHtml(event.deskripsi || event.tipe || '')}</p><span>${escapeHtml(event.lokasi || 'Lokasi akan diumumkan')}</span></div></article>`)
+    .join('');
+}
+
+function ministryCards(limit = 6) {
+  return state.ministries
+    .slice(0, Math.max(1, Number(limit) || 6))
+    .map((ministry) => `<article class="ministry-card"><h3>${escapeHtml(ministry.name || 'Pelayanan')}</h3><p>${escapeHtml(ministry.description || '')}</p>${ministry.leader?.name ? `<p><strong>Pemimpin:</strong> ${escapeHtml(ministry.leader.name)}</p>` : ''}${ministry.schedule ? `<p><strong>Jadwal:</strong> ${escapeHtml(ministry.schedule)}</p>` : ''}</article>`)
+    .join('');
+}
+
+function sectionHtml(section, config) {
+  if (!section?.enabled) return '';
+  const c = section.config || {};
+  switch (section.type) {
+    case 'hero':
+      return `<section class="hero"><div class="container"><span class="eyebrow">${escapeHtml(config.siteName)}</span><h1>${escapeHtml(c.title || config.tagline || 'Selamat datang')}</h1><p>${escapeHtml(c.description || '')}</p></div></section>`;
+    case 'welcome':
+      return `<section class="section"><div class="container"><span class="eyebrow">WELCOME</span><h2>${escapeHtml(c.title || 'Selamat Datang')}</h2><p>${escapeHtml(c.description || 'Kami senang menyambut Anda di website gereja kami.')}</p></div></section>`;
+    case 'about':
+      return `<section class="section"><div class="container"><span class="eyebrow">ABOUT</span><h2>${escapeHtml(c.title || 'Tentang Kami')}</h2><p>${escapeHtml(c.description || 'Kenali lebih dekat gereja dan komunitas kami.')}</p></div></section>`;
+    case 'cta':
+      return `<section class="section alt"><div class="container"><span class="eyebrow">CONNECT</span><h2>${escapeHtml(c.title || 'Mari Terhubung')}</h2><p>${escapeHtml(c.description || 'Kami ingin membantu Anda menemukan tempat untuk bertumbuh dan terhubung.')}</p></div></section>`;
+    case 'sermons':
+      return `<section class="section"><div class="container"><span class="eyebrow">RESOURCES</span><h2>${escapeHtml(c.title || 'Resources')}</h2><p>${escapeHtml(c.description || 'Materi dan khotbah akan tersedia di sini.')}</p></div></section>`;
+    case 'serviceSchedule': {
+      const cards = serviceCards(c.limit || 4);
+      return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${escapeHtml(c.title || 'Jadwal Ibadah')}</h2><div class="services-grid">${cards || '<p>Belum ada jadwal ibadah yang dipublikasikan.</p>'}</div></div></section>`;
+    }
+    case 'featuredEvents': {
+      const cards = eventCards(c.limit || 3);
+      return `<section class="section"><div class="container"><span class="eyebrow">EVENT</span><h2>${escapeHtml(c.title || 'Event Terdekat')}</h2><div class="events-grid">${cards || '<p>Belum ada event yang dipublikasikan.</p>'}</div></div></section>`;
+    }
+    case 'ministries': {
+      const cards = ministryCards(c.limit || 6);
+      return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${escapeHtml(c.title || 'Pelayanan')}</h2><p>${escapeHtml(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p><div class="ministries-grid">${cards || '<p>Belum ada pelayanan yang dipublikasikan.</p>'}</div></div></section>`;
+    }
+    case 'contact':
+      return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${escapeHtml(c.title || 'Hubungi Kami')}</h2><p>${escapeHtml(config.contact?.address || '')}</p><p>${escapeHtml(config.contact?.phone || '')}</p><p>${escapeHtml(config.contact?.email || '')}</p></div></section>`;
+    default:
+      return '';
+  }
+}
+
+function render() {
+  const config = state.config;
+  const pageTitle = state.page?.title || config.siteName || 'Website Gereja';
+  document.title = state.route === '/' ? (config.seo?.title || pageTitle) : `${pageTitle} | ${config.siteName || 'Gereja'}`;
+  document.querySelector('meta[name="description"]')?.setAttribute('content', config.seo?.description || config.tagline || 'Website gereja');
+  document.documentElement.style.setProperty('--primary', config.theme?.primary || '#ff6b00');
+  document.documentElement.style.setProperty('--secondary', config.theme?.secondary || '#1f2937');
+  document.documentElement.style.setProperty('--accent', config.theme?.accent || '#f59e0b');
+
+  const nav = (state.navigation.items || []).filter(item => item.visible !== false);
+  const sections = (state.page?.sections || []).filter(s => s.enabled !== false).sort((a,b) => (a.order || 0) - (b.order || 0));
+
+  $('church-site').innerHTML = `
+    <header class="site-header"><div class="container nav-wrap">
+      <a class="brand" href="${publicUrl('/')}" ><img class="brand-logo ${config.logoUrl ? '' : 'hidden'}" src="${escapeHtml(config.logoUrl)}" alt=""><span>${escapeHtml(config.siteName || 'Gereja')}</span></a>
+      <nav>${nav.map(item => `<a href="${escapeHtml(publicUrl(item.target || '/'))}">${escapeHtml(item.label)}</a>`).join('')}</nav>
+    </div></header>
+    <main><div class="container"><div class="page-heading"><span class="eyebrow">${escapeHtml(config.siteName || 'GEREJA')}</span><h1>${escapeHtml(pageTitle)}</h1></div></div>${sections.map(section => sectionHtml(section, config)).join('')}</main>
+    <footer class="site-footer"><div class="container"><strong>${escapeHtml(config.siteName || 'Gereja')}</strong><span>${escapeHtml(config.tagline || '')}</span></div></footer>`;
+
+  $('site-loading').classList.add('hidden');
+  $('church-site').classList.remove('hidden');
+}
+
+loadSite().then(render).catch((error) => {
+  console.error('[PUBLIC WEBSITE]', error);
+  $('site-loading').classList.add('hidden');
+  $('site-error').textContent = error.message === 'PAGE_NOT_FOUND' ? 'Halaman tidak ditemukan.' : 'Website tidak ditemukan atau belum dipublikasikan.';
+  $('site-error').classList.remove('hidden');
+});
