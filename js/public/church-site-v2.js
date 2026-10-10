@@ -12,9 +12,20 @@ function card(title, body) {
   return `<article class="public-card"><h3>${esc(title)}</h3>${body}</article>`;
 }
 
+async function waitForFirebase(timeoutMs = 10000) {
+  const started = Date.now();
+  while (!window.db) {
+    if (Date.now() - started >= timeoutMs) {
+      throw new Error('FIREBASE_NOT_READY');
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return window.db;
+}
+
 async function main() {
-  if (!slug || !window.db) throw new Error('SITE_NOT_FOUND');
-  const db = window.db;
+  if (!slug) throw new Error('SITE_NOT_FOUND');
+  const db = await waitForFirebase();
   const slugDoc = await getDoc(doc(db, 'siteSlugs', slug));
   if (!slugDoc.exists()) throw new Error('SITE_NOT_FOUND');
   const churchId = slugDoc.data().churchId;
