@@ -23,6 +23,8 @@ describe('Firestore security rules', () => {
       projectId: 'cms-v6-rules-test',
       firestore: {
         rules: fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
       },
     });
 
