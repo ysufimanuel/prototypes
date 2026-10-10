@@ -210,6 +210,17 @@ async function publishGroups(req, res, user) {
   return res.json({ success: true, ministryCount: publicGroups.length });
 }
 
+function getRoutePath(req) {
+  const queryPath = req.query?.path;
+  if (Array.isArray(queryPath)) return queryPath.join("/");
+  if (typeof queryPath === "string" && queryPath) return queryPath.replace(/^\/+|\/+$/g, "");
+
+  const rawUrl = String(req.url || "").split("?", 1)[0];
+  const prefix = "/api/admin/website/";
+  if (!rawUrl.startsWith(prefix)) return "";
+  return decodeURIComponent(rawUrl.slice(prefix.length)).replace(/^\/+|\/+$/g, "");
+}
+
 module.exports = async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (!["GET", "POST", "PUT", "OPTIONS"].includes(req.method)) return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
@@ -217,7 +228,7 @@ module.exports = async function handler(req, res) {
   const user = await requireChurchAdmin(req, res);
   if (!user) return;
 
-  const path = Array.isArray(req.query.path) ? req.query.path.join("/") : String(req.query.path || "");
+  const path = getRoutePath(req);
 
   try {
     if (path === "draft" && req.method === "GET") return await getDraft(req, res, user);
