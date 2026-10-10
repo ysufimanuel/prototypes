@@ -51,7 +51,52 @@ async function getFirebaseAppCheckToken(forceRefresh = false) {
   }
 }
 
+function isAdminApiRequest(input) {
+  try {
+    const url = new URL(
+      typeof input === "string" ? input : input?.url,
+      window.location.origin,
+    );
+    return (
+      url.origin === window.location.origin &&
+      url.pathname.startsWith("/api/admin/")
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function installAppCheckFetchInterceptor() {
+  if (window.__appCheckFetchInterceptorInstalled) return;
+  window.__appCheckFetchInterceptorInstalled = true;
+
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = async (input, init = {}) => {
+    if (!isAdminApiRequest(input)) {
+      return originalFetch(input, init);
+    }
+
+    const token = await getFirebaseAppCheckToken(false);
+    const headers = new Headers(
+      init.headers || (input instanceof Request ? input.headers : undefined),
+    );
+
+    if (token) {
+      headers.set("X-Firebase-AppCheck", token);
+    }
+
+    return originalFetch(input, {
+      ...init,
+      headers,
+    });
+  };
+
+  console.log("[APP CHECK] Admin API fetch interceptor installed");
+}
+
 window.getFirebaseAppCheckToken = getFirebaseAppCheckToken;
 window.initializeFirebaseAppCheck = initializeFirebaseAppCheck;
 
+installAppCheckFetchInterceptor();
 initializeFirebaseAppCheck();
