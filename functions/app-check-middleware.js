@@ -1,4 +1,4 @@
-const { getAppCheck } = require('firebase-admin/app-check');
+const appCheck = require('firebase-admin/app-check');
 
 function isAppCheckEnforced() {
   return String(process.env.APP_CHECK_ENFORCED || '').toLowerCase() === 'true';
@@ -16,7 +16,7 @@ async function requireAppCheck(req, res, next) {
   }
 
   try {
-    const claims = await getAppCheck().verifyToken(appCheckToken);
+    const claims = await appCheck.getAppCheck().verifyToken(appCheckToken);
     req.appCheck = claims;
     return next();
   } catch (error) {
