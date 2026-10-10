@@ -1,16 +1,13 @@
 const express = require('express');
 const { auth, db } = require('./firebase-admin');
 const { requireSuperAdmin } = require('./auth-middleware');
+const { sameChurch } = require('./tenant-access');
 
 const router = express.Router();
 const ALLOWED_ROLES = ['user', 'admin', 'superadmin'];
 
 function validateRole(role) {
     return ALLOWED_ROLES.includes(role);
-}
-
-function sameChurch(req, user) {
-    return !req.user?.churchId || !user.churchId || req.user.churchId === user.churchId;
 }
 
 // CREATE USER
@@ -71,7 +68,7 @@ router.patch('/users/:uid', requireSuperAdmin, async (req, res) => {
         if (!userSnap.exists) return res.status(404).json({ success: false, message: 'User Firestore tidak ditemukan.' });
 
         const existingUser = userSnap.data();
-        if (!sameChurch(req, existingUser)) {
+        if (!sameChurch(req.user, existingUser)) {
             return res.status(403).json({ success: false, message: 'Tidak memiliki akses ke user dari church tersebut.' });
         }
 
@@ -130,7 +127,7 @@ router.delete('/users/:uid', requireSuperAdmin, async (req, res) => {
         const userRef = db.collection('users').doc(uid);
         const userSnap = await userRef.get();
         if (!userSnap.exists) return res.status(404).json({ success: false, message: 'User Firestore tidak ditemukan.' });
-        if (!sameChurch(req, userSnap.data())) return res.status(403).json({ success: false, message: 'Tidak memiliki akses ke user dari church tersebut.' });
+        if (!sameChurch(req.user, userSnap.data())) return res.status(403).json({ success: false, message: 'Tidak memiliki akses ke user dari church tersebut.' });
 
         try {
             await auth.deleteUser(uid);
