@@ -1,6 +1,6 @@
-# Firestore Rules Tests
+# Security Tests
 
-Test ini menjalankan `firestore.rules` melawan Firebase Emulator.
+Test ini menjalankan `firestore.rules` melawan Firebase Emulator dan menguji boundary tenant yang dipakai backend.
 
 ## 1. Install dependency
 
@@ -33,6 +33,7 @@ Semua test harus PASS sebelum rules dianggap aman untuk lanjut ke audit berikutn
 
 ## Coverage saat ini
 
+### Firestore Rules
 - unauthenticated vs private church
 - superadmin read/update church sendiri
 - admin/user read-only untuk church document
@@ -42,3 +43,10 @@ Semua test harus PASS sebelum rules dianggap aman untuk lanjut ke audit berikutn
 - publicSites dan siteSlugs read-only
 - protected user profile fields
 - superadmin update user dalam tenant yang sama
+
+### Backend tenant boundary
+- requester dan target dengan `churchId` yang sama diperbolehkan
+- requester dan target dengan `churchId` berbeda ditolak
+- requester tanpa `churchId` ditolak
+- target user tanpa `churchId` ditolak
+- `churchId` kosong/falsy ditolak
