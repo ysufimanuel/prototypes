@@ -3,11 +3,12 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node --test firestore.rules.test.js tenant-isolation.test.js auth-middleware.test.js"
+    "test": "node --test firestore.rules.test.js tenant-isolation.test.js auth-middleware.test.js api-admin-users.test.js"
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
     "firebase": "^12.10.0",
-    "firebase-admin": "^13.5.0"
+    "firebase-admin": "^13.5.0",
+    "express": "^5.1.0"
   }
 }
