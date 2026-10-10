@@ -69,8 +69,17 @@ router.post('/publish',requireChurchAdmin,async(req,res)=>{try{
   if(!configSnap.exists)return res.status(400).json({success:false,message:'Draft website belum tersedia'});
   const publicBase=db.collection('publicSites').doc(churchId),batch=db.batch(),config=configSnap.data();
   const safeConfig={enabled:!!config.enabled,templateId:config.templateId||'modern-church',siteName:cleanString(config.siteName,120),tagline:cleanString(config.tagline,180),logoUrl:cleanString(config.logoUrl,1000),faviconUrl:cleanString(config.faviconUrl,1000),theme:config.theme||DEFAULT_CONFIG.theme,seo:config.seo||DEFAULT_CONFIG.seo,contact:config.contact||DEFAULT_CONFIG.contact,social:config.social||DEFAULT_CONFIG.social,slug,publishedAt:now(),publishedBy:req.user.uid};
-  batch.set(publicBase.collection('config').doc('site'),safeConfig,{merge:true});if(navSnap.exists)batch.set(publicBase.collection('navigation').doc('main'),navSnap.data());
-  pagesSnap.forEach(s=>{const d=s.data();batch.set(publicBase.collection('pages').doc(s.id),{title:cleanString(d.title,120),slug:cleanString(d.slug,200),published:d.published!==false,sections:Array.isArray(d.sections)?d.sections:[],publishedAt:now()});});
+  batch.set(publicBase.collection('config').doc('site'),safeConfig,{merge:true});
+  if(navSnap.exists)batch.set(publicBase.collection('navigation').doc('main'),navSnap.data());
+
+  const existingPublicPages = await publicBase.collection('pages').get();
+  existingPublicPages.forEach(pageSnap => batch.delete(pageSnap.ref));
+  pagesSnap.forEach(s=>{
+    const d=s.data();
+    if(d.published !== true) return;
+    batch.set(publicBase.collection('pages').doc(s.id),{title:cleanString(d.title,120),slug:cleanString(d.slug,200),published:true,sections:Array.isArray(d.sections)?d.sections:[],publishedAt:now()});
+  });
+
   batch.set(source.doc('config'),{status:'published',publishedAt:now(),publishedBy:req.user.uid,updatedAt:now(),updatedBy:req.user.uid},{merge:true});
   batch.set(churchRef,{website:{enabled:true,slug,status:'published',templateId:config.templateId||'modern-church',publishedAt:now(),updatedAt:now()}},{merge:true});
   await batch.commit();res.json({success:true,slug,message:'Website berhasil dipublikasikan'});
