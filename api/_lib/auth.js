@@ -1,4 +1,5 @@
 const { auth, db } = require("./firebase-admin");
+const { requireAppCheck } = require("./app-check");
 
 async function getAuthenticatedUser(req, res) {
   const authHeader = req.headers.authorization || "";
@@ -60,11 +61,12 @@ async function getAuthenticatedUser(req, res) {
   };
 }
 
-async function requireSuperAdmin(req, res) {
+async function requireChurchAdmin(req, res) {
+  if (!(await requireAppCheck(req, res))) return null;
   const user = await getAuthenticatedUser(req, res);
   if (!user) return null;
-  if (user.role !== "superadmin") {
-    res.status(403).json({ success: false, message: "Akses hanya untuk Superadmin" });
+  if (!["admin", "superadmin"].includes(user.role)) {
+    res.status(403).json({ success: false, message: "Akses hanya untuk Admin atau Superadmin" });
     return null;
   }
   if (!user.churchId) {
@@ -74,11 +76,12 @@ async function requireSuperAdmin(req, res) {
   return user;
 }
 
-async function requireChurchAdmin(req, res) {
+async function requireSuperAdmin(req, res) {
+  if (!(await requireAppCheck(req, res))) return null;
   const user = await getAuthenticatedUser(req, res);
   if (!user) return null;
-  if (!["admin", "superadmin"].includes(user.role)) {
-    res.status(403).json({ success: false, message: "Akses hanya untuk Admin atau Superadmin" });
+  if (user.role !== "superadmin") {
+    res.status(403).json({ success: false, message: "Akses hanya untuk Superadmin" });
     return null;
   }
   if (!user.churchId) {
