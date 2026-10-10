@@ -1,5 +1,4 @@
 const APP_CHECK_SITE_KEY = "6Lc6Y-gtAAAAAOIWYAW8j66GnhgFn3vbc-xGUjI8";
-const FIREBASE_API_BASE_URL = "https://us-central1-churchmanagementsystem-a77a3.cloudfunctions.net";
 const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(
   window.location.hostname,
 );
@@ -67,16 +66,6 @@ function isAdminApiRequest(input) {
   }
 }
 
-function buildAdminApiUrl(input) {
-  const url = new URL(
-    typeof input === "string" ? input : input?.url,
-    window.location.origin,
-  );
-
-  if (isLocalhost) return url.href;
-  return `${FIREBASE_API_BASE_URL}${url.pathname}${url.search}`;
-}
-
 function installAppCheckFetchInterceptor() {
   if (window.__appCheckFetchInterceptorInstalled) return;
   window.__appCheckFetchInterceptorInstalled = true;
@@ -97,12 +86,7 @@ function installAppCheckFetchInterceptor() {
       headers.set("X-Firebase-AppCheck", token);
     }
 
-    const apiUrl = buildAdminApiUrl(input);
-    const requestInput = input instanceof Request ? new Request(apiUrl, input) : apiUrl;
-
-    console.log("[APP CHECK] Admin API request:", apiUrl);
-
-    return originalFetch(requestInput, {
+    return originalFetch(input, {
       ...init,
       headers,
     });
