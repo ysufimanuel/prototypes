@@ -6,7 +6,7 @@
     "test": "node --test firestore.rules.test.js"
   },
   "dependencies": {
-    "@firebase/rules-unit-testing": "^6.0.0",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "firebase": "^12.10.0"
   }
 }
