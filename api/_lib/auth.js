@@ -1,16 +1,21 @@
 const { auth, db } = require("./firebase-admin");
+const { requireAppCheck } = require("./app-check");
 
-async function requireSuperAdmin(req, res) {
+async function getAuthenticatedUser(req, res) {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ success: false, message: "Token autentikasi tidak ditemukan" });
+    res
+      .status(401)
+      .json({ success: false, message: "Token autentikasi tidak ditemukan" });
     return null;
   }
 
   const idToken = authHeader.substring(7).trim();
   if (!idToken) {
-    res.status(401).json({ success: false, message: "Token autentikasi kosong" });
+    res
+      .status(401)
+      .json({ success: false, message: "Token autentikasi kosong" });
     return null;
   }
 
@@ -22,12 +27,10 @@ async function requireSuperAdmin(req, res) {
       name: error?.name || null,
       code: error?.code || null,
       message: error?.message || "Unknown auth error",
-      details: error?.details || null,
     });
-
     res.status(401).json({
       success: false,
-      message: `Verifikasi ID token gagal (${error?.code || "unknown"}).`,
+      message: "Token autentikasi tidak valid atau sudah kedaluwarsa.",
     });
     return null;
   }
@@ -40,18 +43,18 @@ async function requireSuperAdmin(req, res) {
       name: error?.name || null,
       code: error?.code || null,
       message: error?.message || "Unknown Firestore error",
-      details: error?.details || null,
     });
-
     res.status(500).json({
       success: false,
-      message: `Backend gagal mengakses Firestore (${error?.code || "unknown"}).`,
+      message: "Backend gagal memverifikasi profil pengguna.",
     });
     return null;
   }
 
   if (!userSnap.exists) {
-    res.status(403).json({ success: false, message: "Profil user tidak ditemukan" });
+    res
+      .status(403)
+      .json({ success: false, message: "Profil user tidak ditemukan" });
     return null;
   }
 
@@ -59,16 +62,6 @@ async function requireSuperAdmin(req, res) {
 
   if (userData.uid !== decoded.uid) {
     res.status(403).json({ success: false, message: "UID user tidak cocok" });
-    return null;
-  }
-
-  if (userData.role !== "superadmin") {
-    res.status(403).json({ success: false, message: "Akses hanya untuk Superadmin" });
-    return null;
-  }
-
-  if (!userData.churchId) {
-    res.status(403).json({ success: false, message: "User belum memiliki church" });
     return null;
   }
 
@@ -80,4 +73,43 @@ async function requireSuperAdmin(req, res) {
   };
 }
 
-module.exports = { requireSuperAdmin };
+async function requireChurchAdmin(req, res) {
+  if (!(await requireAppCheck(req, res))) return null;
+  const user = await getAuthenticatedUser(req, res);
+  if (!user) return null;
+  if (!["admin", "superadmin"].includes(user.role)) {
+    res.status(403).json({
+      success: false,
+      message: "Akses hanya untuk Admin atau Superadmin",
+    });
+    return null;
+  }
+  if (!user.churchId) {
+    res
+      .status(403)
+      .json({ success: false, message: "User belum memiliki church" });
+    return null;
+  }
+  return user;
+}
+
+async function requireSuperAdmin(req, res) {
+  if (!(await requireAppCheck(req, res))) return null;
+  const user = await getAuthenticatedUser(req, res);
+  if (!user) return null;
+  if (user.role !== "superadmin") {
+    res
+      .status(403)
+      .json({ success: false, message: "Akses hanya untuk Superadmin" });
+    return null;
+  }
+  if (!user.churchId) {
+    res
+      .status(403)
+      .json({ success: false, message: "User belum memiliki church" });
+    return null;
+  }
+  return user;
+}
+
+module.exports = { requireSuperAdmin, requireChurchAdmin };
