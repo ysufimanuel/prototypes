@@ -58,8 +58,18 @@ test("Vercel user-management endpoints enforce tenant isolation", () => {
 test("Vercel user-management prevents self destructive operations", () => {
   const source = read("api/admin/users/[uid].js");
   assert.match(source, /requester\.uid === uid/);
-  assert.match(source, /Tidak dapat menghapus akun diri sendiri/);
+  assert.match(source, /Tidak dapat menghapus akun sendiri/);
   assert.match(source, /Super Admin tidak dapat mengubah role dirinya sendiri/);
+});
+
+test("Vercel website catch-all resolves route path from query or request URL", () => {
+  const source = read("api/admin/website/[...path].js");
+  assert.match(source, /function getRoutePath\(req\)/);
+  assert.match(source, /req\.query\?\.path/);
+  assert.match(source, /req\.url/);
+  assert.match(source, /const path = getRoutePath\(req\)/);
+  assert.match(source, /path === "draft"/);
+  assert.match(source, /path === "provision"/);
 });
 
 test("Vercel public build keeps Firebase Admin server-side", () => {
