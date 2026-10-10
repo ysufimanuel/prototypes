@@ -25,13 +25,17 @@ const websiteRouter = require('../functions/website');
 
 const AUTH_HOST = 'http://127.0.0.1:9099';
 const API_KEY = 'test-api-key';
-const CHURCH_A = `website-a-${Date.now()}`;
-const CHURCH_B = `website-b-${Date.now()}`;
+const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const CHURCH_A = `website-a-${RUN_ID}`;
+const CHURCH_B = `website-b-${RUN_ID}`;
+const CHURCH_A_NAME = `Church A ${RUN_ID}`;
+const CHURCH_B_NAME = `Church B ${RUN_ID}`;
 
 let server;
 let baseUrl;
 let users = [];
 let rulesTestEnv;
+let churchASlug;
 
 async function createTestUser(role, churchId, suffix) {
   const uid = `website-test-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -83,6 +87,13 @@ async function seedChurch(churchId, name) {
   });
 }
 
+async function cleanupSiteSlugsForChurch(churchId) {
+  const snapshot = await db.collection('siteSlugs').where('churchId', '==', churchId).get();
+  const batch = db.batch();
+  snapshot.forEach(docSnap => batch.delete(docSnap.ref));
+  if (!snapshot.empty) await batch.commit();
+}
+
 describe('Website publish and public access security', () => {
   before(async () => {
     const app = express();
@@ -99,8 +110,8 @@ describe('Website publish and public access security', () => {
     users.push({ ...(await createTestUser('user', CHURCH_A, 'user-a')), role: 'user', churchId: CHURCH_A });
     users.push({ ...(await createTestUser('superadmin', CHURCH_B, 'superadmin-b')), role: 'superadmin', churchId: CHURCH_B });
 
-    await seedChurch(CHURCH_A, 'Church A');
-    await seedChurch(CHURCH_B, 'Church B');
+    await seedChurch(CHURCH_A, CHURCH_A_NAME);
+    await seedChurch(CHURCH_B, CHURCH_B_NAME);
 
     const rulesPath = path.join(__dirname, '..', 'firestore.rules');
     rulesTestEnv = await initializeTestEnvironment({
@@ -123,6 +134,8 @@ describe('Website publish and public access security', () => {
     await db.collection('churches').doc(CHURCH_B).delete().catch(() => {});
     await db.collection('publicSites').doc(CHURCH_A).delete().catch(() => {});
     await db.collection('publicSites').doc(CHURCH_B).delete().catch(() => {});
+    await cleanupSiteSlugsForChurch(CHURCH_A);
+    await cleanupSiteSlugsForChurch(CHURCH_B);
     if (server) await new Promise((resolve) => server.close(resolve));
   });
 
@@ -143,12 +156,14 @@ describe('Website publish and public access security', () => {
     const provision = await apiRequest('POST', '/api/admin/website/provision', users[1].idToken, {});
     assert.equal(provision.status, 200);
     assert.equal(provision.body.success, true);
-    assert.equal(provision.body.slug, 'church-a');
+    assert.equal(typeof provision.body.slug, 'string');
+    assert.ok(provision.body.slug.length > 0);
+    churchASlug = provision.body.slug;
 
     const publish = await apiRequest('POST', '/api/admin/website/publish', users[1].idToken, {});
     assert.equal(publish.status, 200);
     assert.equal(publish.body.success, true);
-    assert.equal(publish.body.slug, 'church-a');
+    assert.equal(publish.body.slug, churchASlug);
   });
 
   test('published public data contains only published pages', async () => {
@@ -189,7 +204,7 @@ describe('Website publish and public access security', () => {
   test('public users can read published site data', async () => {
     const publicContext = rulesTestEnv.unauthenticatedContext();
     const configRef = doc(publicContext.firestore(), 'publicSites', CHURCH_A, 'config', 'site');
-    const slugRef = doc(publicContext.firestore(), 'siteSlugs', 'church-a');
+    const slugRef = doc(publicContext.firestore(), 'siteSlugs', churchASlug);
     assert.equal((await assertSucceeds(getDoc(configRef))).exists(), true);
     assert.equal((await assertSucceeds(getDoc(slugRef))).exists(), true);
   });
@@ -197,14 +212,14 @@ describe('Website publish and public access security', () => {
   test('public users cannot write publicSites or siteSlugs', async () => {
     const publicContext = rulesTestEnv.unauthenticatedContext();
     const publicConfig = doc(publicContext.firestore(), 'publicSites', CHURCH_A, 'config', 'site');
-    const slugRef = doc(publicContext.firestore(), 'siteSlugs', 'church-a');
+    const slugRef = doc(publicContext.firestore(), 'siteSlugs', churchASlug);
     await assertFails(setDoc(publicConfig, { enabled: false }));
     await assertFails(setDoc(slugRef, { churchId: CHURCH_B }));
   });
 
   test('public site slug cannot be read as a different church', async () => {
     const publicContext = rulesTestEnv.unauthenticatedContext();
-    const slug = await getDoc(publicContext.firestore() && doc(publicContext.firestore(), 'siteSlugs', 'church-a'));
+    const slug = await getDoc(doc(publicContext.firestore(), 'siteSlugs', churchASlug));
     assert.equal(slug.exists(), true);
     assert.equal(slug.data().churchId, CHURCH_A);
   });
@@ -218,7 +233,7 @@ describe('Website publish and public access security', () => {
   });
 
   test('site slug is unique and points to the owning church', async () => {
-    const slug = await db.collection('siteSlugs').doc('church-a').get();
+    const slug = await db.collection('siteSlugs').doc(churchASlug).get();
     assert.equal(slug.exists, true);
     assert.equal(slug.data().churchId, CHURCH_A);
 
