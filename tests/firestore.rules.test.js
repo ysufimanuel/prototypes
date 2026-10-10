@@ -156,14 +156,14 @@ describe('Firestore security rules', () => {
   test('public site and slug are readable but not writable', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
-      await setDoc(doc(db, 'publicSites', churchA, 'config'), { siteName: 'Public Church' });
+      await setDoc(doc(db, 'publicSites', churchA, 'config', 'site'), { siteName: 'Public Church' });
       await setDoc(doc(db, 'siteSlugs', 'church-a'), { churchId: churchA });
     });
 
     const publicDb = testEnv.unauthenticatedContext().firestore();
-    await assertSucceeds(getDoc(doc(publicDb, 'publicSites', churchA, 'config')));
+    await assertSucceeds(getDoc(doc(publicDb, 'publicSites', churchA, 'config', 'site')));
     await assertSucceeds(getDoc(doc(publicDb, 'siteSlugs', 'church-a')));
-    await assertFails(setDoc(doc(publicDb, 'publicSites', churchA, 'config'), { siteName: 'Hacked' }));
+    await assertFails(setDoc(doc(publicDb, 'publicSites', churchA, 'config', 'site'), { siteName: 'Hacked' }));
     await assertFails(setDoc(doc(publicDb, 'siteSlugs', 'church-a'), { churchId: churchB }));
   });
 
