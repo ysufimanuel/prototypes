@@ -6,7 +6,7 @@ const {
   assertFails,
 } = require('@firebase/rules-unit-testing');
 const { doc, setDoc, updateDoc, deleteDoc, getDoc } = require('firebase/firestore');
-const { describe, test, beforeAll, afterAll } = require('node:test');
+const { describe, test, before, after } = require('node:test');
 
 describe('Firestore security rules', () => {
   let testEnv;
@@ -18,7 +18,7 @@ describe('Firestore security rules', () => {
   const user = 'user-uid';
   const otherUser = 'other-user-uid';
 
-  beforeAll(async () => {
+  before(async () => {
     testEnv = await initializeTestEnvironment({
       projectId: 'cms-v6-rules-test',
       firestore: {
@@ -65,7 +65,7 @@ describe('Firestore security rules', () => {
     });
   });
 
-  afterAll(async () => {
+  after(async () => {
     await testEnv.cleanup();
   });
 
