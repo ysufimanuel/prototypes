@@ -1,14 +1,14 @@
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
-process.env.GCLOUD_PROJECT = 'cms-v6-rules-test';
+const PROJECT_ID = process.env.FIREBASE_TEST_PROJECT_ID || 'churchmanagementsystem-a77a3';
+process.env.GCLOUD_PROJECT = PROJECT_ID;
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 
 const { auth, db } = require('../functions/firebase-admin');
 const { requireSuperAdmin, requireChurchAdmin } = require('../functions/auth-middleware');
 
-const PROJECT_ID = 'cms-v6-rules-test';
 const AUTH_HOST = 'http://127.0.0.1:9099';
 const API_KEY = 'test-api-key';
 
@@ -69,11 +69,14 @@ describe('Auth middleware security', () => {
   let users = [];
 
   before(async () => {
-    users = await Promise.all([
-      createTestUser('superadmin', 'church-a', 'superadmin'),
-      createTestUser('admin', 'church-a', 'admin'),
-      createTestUser('user', 'church-a', 'user'),
-    ]);
+    users = [];
+    for (const [role, churchId, suffix] of [
+      ['superadmin', 'church-a', 'superadmin'],
+      ['admin', 'church-a', 'admin'],
+      ['user', 'church-a', 'user'],
+    ]) {
+      users.push(await createTestUser(role, churchId, suffix));
+    }
   });
 
   after(async () => {
