@@ -35,11 +35,47 @@ service cloud.firestore {
          getUserProfile().role == 'superadmin');
     }
 
-    match /users/{userId} {
-      allow read: if isAuthenticated() && request.auth.uid == userId;
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId;
-      allow delete: if isSuperAdmin(resource.data.churchId);
+    match /users/{uid} {
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == uid ||
+         (userExists() && resource.data.churchId == getUserProfile().churchId));
+
+      allow create: if isAuthenticated() &&
+        request.auth.uid == uid &&
+        request.resource.data.uid == uid &&
+        (
+          (request.resource.data.role == 'superadmin' &&
+           exists(/databases/$(database)/documents/churches/$(request.resource.data.churchId)) &&
+           get(/databases/$(database)/documents/churches/$(request.resource.data.churchId)).data.superadminUid == uid)
+          ||
+          (userExists() &&
+           getUserProfile().churchId == request.resource.data.churchId &&
+           getUserProfile().role in ['admin', 'superadmin'] &&
+           request.resource.data.role == 'user')
+        );
+
+      // User may edit only ordinary profile fields on their own account.
+      allow update: if isAuthenticated() &&
+        request.auth.uid == uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'uid', 'role', 'churchId', 'status', 'createdAt'
+        ]);
+
+      // Superadmin may update another user only within the same church.
+      // UID and churchId remain immutable.
+      allow update: if isAuthenticated() &&
+        userExists() &&
+        getUserProfile().role == 'superadmin' &&
+        request.auth.uid != uid &&
+        resource.data.churchId == getUserProfile().churchId &&
+        request.resource.data.churchId == resource.data.churchId &&
+        request.resource.data.uid == resource.data.uid;
+
+      allow delete: if isAuthenticated() &&
+        userExists() &&
+        getUserProfile().role == 'superadmin' &&
+        request.auth.uid != uid &&
+        resource.data.churchId == getUserProfile().churchId;
     }
 
     match /messages/{messageId} {
@@ -59,7 +95,7 @@ service cloud.firestore {
     match /churches/{churchId} {
       allow read: if belongsToChurch(churchId);
       allow create: if isSuperAdmin(churchId);
-      allow update: if isAdmin(churchId);
+      allow update: if isSuperAdmin(churchId);
       allow delete: if isSuperAdmin(churchId);
 
       match /members/{memberId} {
