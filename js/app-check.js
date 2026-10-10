@@ -1,4 +1,4 @@
-const APP_CHECK_SITE_KEY = window.APP_CHECK_SITE_KEY || "";
+const APP_CHECK_SITE_KEY = "6Lc6Y-gtAAAAAOIWYAW8j66GnhgFn3vbc-xGUjI8";
 const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(
   window.location.hostname,
 );
