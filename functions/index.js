@@ -22,4 +22,16 @@ app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "CMS V6 Backend hidup 🔥" });
 });
 
-exports.api = onRequest(app);
+// Frontend production runs on Vercel, so the API is called cross-origin.
+// Keep the allowlist limited to the CMS Vercel domains and branch previews.
+const allowedCorsOrigins = [
+  "https://church-managements.vercel.app",
+  "https://prototypes-ysufimanuel.vercel.app",
+  "https://prototypes-rouge.vercel.app",
+  /^https:\/\/prototypes-[a-z0-9-]+-ysufimanuel\.vercel\.app$/,
+];
+
+exports.api = onRequest(
+  { cors: allowedCorsOrigins },
+  app,
+);
