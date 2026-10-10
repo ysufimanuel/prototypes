@@ -6,6 +6,7 @@ const {
   assertFails,
 } = require('@firebase/rules-unit-testing');
 const { doc, setDoc, updateDoc, deleteDoc, getDoc } = require('firebase/firestore');
+const { describe, test, beforeAll, afterAll } = require('node:test');
 
 describe('Firestore security rules', () => {
   let testEnv;
