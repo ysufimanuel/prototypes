@@ -3,7 +3,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node --test firestore.rules.test.js tenant-isolation.test.js auth-middleware.test.js api-admin-users.test.js website-security.test.js security-hardening.test.js"
+    "test": "node --test firestore.rules.test.js tenant-isolation.test.js auth-middleware.test.js api-admin-users.test.js website-security.test.js security-hardening.test.js app-check.test.js"
   },
   "dependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
