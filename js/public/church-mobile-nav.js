@@ -12,15 +12,14 @@ function initMobileNav() {
   button.className = "mobile-menu-toggle";
   button.setAttribute("aria-label", "Buka menu");
   button.setAttribute("aria-expanded", "false");
-  button.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i>';
+  button.textContent = "☰";
 
   const drawer = document.createElement("div");
   drawer.className = "mobile-nav-drawer";
-  drawer.innerHTML = `<div class="mobile-nav-panel"><div class="mobile-nav-head"><strong>Menu</strong><button type="button" class="mobile-nav-close" aria-label="Tutup menu"><i class="fas fa-times"></i></button></div><div class="mobile-nav-links"></div></div>`;
+  drawer.innerHTML = `<div class="mobile-nav-panel"><div class="mobile-nav-head"><strong>Menu</strong><button type="button" class="mobile-nav-close" aria-label="Tutup menu">×</button></div><div class="mobile-nav-links"></div></div>`;
   const links = drawer.querySelector(".mobile-nav-links");
   nav.querySelectorAll("a").forEach((link) => {
     const clone = link.cloneNode(true);
-    clone.addEventListener("click", () => close());
     links.appendChild(clone);
   });
 
@@ -39,11 +38,11 @@ function initMobileNav() {
   };
   button.addEventListener("click", () => drawer.classList.contains("open") ? close() : open());
   drawer.querySelector(".mobile-nav-close")?.addEventListener("click", close);
+  links.querySelectorAll("a").forEach((link) => link.addEventListener("click", close));
   drawer.addEventListener("click", (event) => { if (event.target === drawer) close(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); }, { passive: true });
 }
 
-const observer = new MutationObserver(initMobileNav);
 const root = document.getElementById("church-site");
-if (root) observer.observe(root, { childList: true, subtree: true });
+if (root) new MutationObserver(initMobileNav).observe(root, { childList: true, subtree: true });
 initMobileNav();
