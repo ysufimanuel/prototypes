@@ -38,7 +38,11 @@ function sectionHtml(section, config, payload) {
       const cards = (payload.ministries || []).slice(0, Math.max(1,Number(c.limit)||6)).map(m => `<article class="ministry-card"><h3>${escapeHtml(m.name || 'Pelayanan')}</h3><p>${escapeHtml(m.description || '')}</p>${m.leader?.name ? `<p><strong>Pemimpin:</strong> ${escapeHtml(m.leader.name)}</p>` : ''}${m.schedule ? `<p><strong>Jadwal:</strong> ${escapeHtml(m.schedule)}</p>` : ''}</article>`).join('');
       return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${escapeHtml(c.title || 'Pelayanan')}</h2><p>${escapeHtml(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p><div class="ministries-grid">${cards || '<p>Belum ada pelayanan yang tersedia.</p>'}</div></div></section>`;
     }
-    case 'contact': return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${escapeHtml(c.title || 'Hubungi Kami')}</h2><p>${escapeHtml(config.contact?.address || '')}</p><p>${escapeHtml(config.contact?.phone || '')}</p><p>${escapeHtml(config.contact?.email || '')}</p></div></section>`;
+    case 'contact': {
+      const mapsUrl = String(config.contact?.mapsUrl || '').trim();
+      const mapsHtml = mapsUrl ? `<p><a href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener noreferrer">📍 Lihat lokasi di Google Maps</a></p>` : '';
+      return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${escapeHtml(c.title || 'Hubungi Kami')}</h2><p>${escapeHtml(config.contact?.address || '')}</p><p>${escapeHtml(config.contact?.phone || '')}</p><p>${escapeHtml(config.contact?.email || '')}</p>${mapsHtml}</div></section>`;
+    }
     default: return '';
   }
 }
