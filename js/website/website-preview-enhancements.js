@@ -39,15 +39,13 @@ function resourceHtml(resource) {
   if (type === "spotify" && parsed.hostname.endsWith("spotify.com")) return `<article class="public-card"><h3>${esc(title)}</h3><div class="resource-embed resource-spotify"><iframe src="https://open.spotify.com/embed/${esc(parsed.pathname.replace(/^\//, ""))}" title="${esc(title)}" loading="lazy"></iframe></div></article>`;
   return `<article class="public-card"><h3>${esc(title)}</h3><p><a href="${esc(parsed.href)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a></p></article>`;
 }
-function addResourcesToPreview(payload) {
-  const site = document.getElementById("church-site");
+function addResourcesToPreview(page) {
+  const site = frame()?.contentDocument?.getElementById("church-site");
   if (!site) return;
   site.querySelector(".preview-resource-enhancement")?.remove();
-  const page = payload?.page;
-  const sections = (page?.sections || []).filter((section) => section.enabled !== false);
-  const resourceSections = sections.filter((section) => section.type === "resources" || section.type === "sermons");
+  const resourceSections = (page?.sections || []).filter((section) => section.enabled !== false && (section.type === "resources" || section.type === "sermons"));
   if (!resourceSections.length) return;
-  const wrapper = document.createElement("div");
+  const wrapper = site.ownerDocument.createElement("div");
   wrapper.className = "preview-resource-enhancement";
   wrapper.innerHTML = resourceSections.map((section) => {
     const c = section.config || {};
@@ -82,7 +80,6 @@ async function sendSelected() {
   if (!page) return;
   const content = await publicContent(data.church?.id);
   frame().contentWindow.postMessage({ type: "CMS_WEBSITE_PREVIEW", churchId: data.church?.id || "", slug: data.church?.website?.slug || "", config: data.config || {}, navigation: data.navigation || { items: [] }, page, ...content }, window.location.origin);
-  addResourcesToPreview({ page });
 }
 function ensurePagePicker() {
   const toolbar = document.querySelector(".preview-toolbar");
@@ -94,23 +91,32 @@ function ensurePagePicker() {
   toolbar.insertBefore(select, toolbar.querySelector("#preview-refresh"));
   select.addEventListener("change", async () => { selectedPage = select.value; await sendSelected(); });
 }
-async function refresh() {
+async function refresh(event) {
+  event?.preventDefault();
+  event?.stopImmediatePropagation();
   try {
     ensurePagePicker();
     const data = await fetchDraft();
     const select = document.getElementById("preview-page-select");
     if (select) {
       select.innerHTML = (data?.pages || []).map((page) => `<option value="${esc(page.id)}">${esc(page.title || page.id)}</option>`).join("");
-      if (!selectedPage) selectedPage = data?.pages?.find((p) => p.id === "home")?.id || data?.pages?.[0]?.id || "";
+      if (!selectedPage || !(data?.pages || []).some((page) => page.id === selectedPage)) selectedPage = data?.pages?.find((p) => p.id === "home")?.id || data?.pages?.[0]?.id || "";
       select.value = selectedPage;
     }
     await sendSelected();
+    const button = document.getElementById("preview-refresh");
+    if (button) { button.disabled = true; setTimeout(() => { button.disabled = false; }, 250); }
   } catch (error) { console.error("[WEBSITE PREVIEW ENHANCEMENT]", error); }
 }
 function init() {
   ensurePagePicker();
   document.getElementById("preview-refresh")?.addEventListener("click", refresh, true);
-  document.getElementById("website-preview-frame")?.addEventListener("load", () => sendSelected().catch(console.error));
+  document.getElementById("website-preview-frame")?.addEventListener("load", () => { sendSelected().then(() => { const page = (draftCache?.pages || []).find((p) => p.id === selectedPage); if (page) addResourcesToPreview(page); }).catch(console.error); });
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin || event.data?.type !== "CMS_WEBSITE_PREVIEW_READY") return;
+    const page = (draftCache?.pages || []).find((p) => p.id === selectedPage);
+    if (page) addResourcesToPreview(page);
+  });
   window.addEventListener("cms:website-draft-updated", () => refresh());
   refresh();
   new MutationObserver(ensurePagePicker).observe(document.body, { childList: true, subtree: true });
