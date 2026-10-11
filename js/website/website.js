@@ -25,6 +25,7 @@ const SECTION_TYPES = [
   "about",
   "ministries",
   "sermons",
+  "resources",
   "contact",
   "cta",
 ];
@@ -69,6 +70,7 @@ function sectionLabel(type) {
       about: "Tentang Kami",
       ministries: "Pelayanan",
       sermons: "Resources / Khotbah",
+      resources: "Resources",
       contact: "Kontak",
       cta: "Call to Action",
     }[type] || type
@@ -82,6 +84,28 @@ function sectionDefaults(type) {
     order: 1,
     config: {},
   };
+}
+function resourceDefaults() {
+  return {
+    id: `resource-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "youtube",
+    title: "",
+    url: "",
+  };
+}
+function resourceTypeLabel(type) {
+  return (
+    {
+      youtube: "YouTube",
+      vimeo: "Vimeo",
+      spotify: "Spotify",
+      soundcloud: "SoundCloud",
+      google_maps: "Google Maps",
+      image: "Gambar",
+      pdf: "PDF",
+      link: "External Link",
+    }[type] || type
+  );
 }
 
 async function api(path, options = {}) {
@@ -280,21 +304,123 @@ function renderEditorSections() {
   const sections = (state.editingPage.sections || [])
     .slice()
     .sort((a, b) => (a.order || 0) - (b.order || 0));
+
   el.innerHTML = sections
     .map((section, index) => {
       const c = section.config || {};
-      return `<article class="editor-section" data-editor-section="${escapeHtml(section.id)}"><div class="editor-section-top"><div><strong>${index + 1}. ${escapeHtml(sectionLabel(section.type))}</strong><small>${escapeHtml(section.type)}</small></div><div class="editor-section-actions"><label class="editor-checkbox"><input class="section-enabled" type="checkbox" ${section.enabled !== false ? "checked" : ""}> Aktif</label><button class="icon-btn section-delete" type="button" title="Hapus"><i class="fas fa-trash"></i></button></div></div><div class="form-grid"><label>Jenis<select class="section-type">${SECTION_TYPES.map((type) => `<option value="${type}" ${section.type === type ? "selected" : ""}>${escapeHtml(sectionLabel(type))}</option>`).join("")}</select></label><label>Judul<input class="section-title" type="text" maxlength="160" value="${escapeHtml(c.title || "")}"></label><label class="full">Deskripsi<textarea class="section-description" rows="3" maxlength="500">${escapeHtml(c.description || "")}</textarea></label>${["serviceSchedule", "featuredEvents", "ministries"].includes(section.type) ? `<label>Batas Item<input class="section-limit" type="number" min="1" max="20" value="${Number(c.limit) || 4}"></label>` : ""}</div></article>`;
+      const resources = Array.isArray(c.resources) ? c.resources : [];
+      const resourceTypes = [
+        "youtube",
+        "vimeo",
+        "spotify",
+        "soundcloud",
+        "google_maps",
+        "image",
+        "pdf",
+        "link",
+      ];
+
+      const resourcesEditor =
+        section.type === "resources"
+          ? `<div class="full">
+              <div class="form-grid">
+                <div class="full" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                  <strong>Daftar Resource</strong>
+                  <button type="button" class="website-btn secondary resource-add">+ Tambah Resource</button>
+                </div>
+                <div class="full resources-list">
+                  ${
+                    resources.length
+                      ? resources
+                          .map(
+                            (resource) => `
+                              <div class="resource-editor-item" data-resource-id="${escapeHtml(resource.id || "")}" style="border:1px solid var(--border-color,#e5e7eb);padding:12px;border-radius:10px;">
+                                <div class="form-grid">
+                                  <label>
+                                    Jenis
+                                    <select class="resource-type">
+                                      ${resourceTypes
+                                        .map(
+                                          (type) => `<option value="${type}" ${resource.type === type ? "selected" : ""}>${escapeHtml(resourceTypeLabel(type))}</option>`,
+                                        )
+                                        .join("")}
+                                    </select>
+                                  </label>
+                                  <label>
+                                    Judul
+                                    <input class="resource-title" type="text" maxlength="160" value="${escapeHtml(resource.title || "")}">
+                                  </label>
+                                  <label class="full">
+                                    URL
+                                    <input class="resource-url" type="url" maxlength="1000" value="${escapeHtml(resource.url || "")}" placeholder="https://...">
+                                  </label>
+                                  <div class="full">
+                                    <button type="button" class="website-btn secondary resource-delete">Hapus Resource</button>
+                                  </div>
+                                </div>
+                              </div>
+                            `,
+                          )
+                          .join("")
+                      : `<p class="full">Belum ada resource.</p>`
+                  }
+                </div>
+              </div>
+            </div>`
+          : "";
+
+      return `<article class="editor-section" data-editor-section="${escapeHtml(section.id)}"><div class="editor-section-top"><div><strong>${index + 1}. ${escapeHtml(sectionLabel(section.type))}</strong><small>${escapeHtml(section.type)}</small></div><div class="editor-section-actions"><label class="editor-checkbox"><input class="section-enabled" type="checkbox" ${section.enabled !== false ? "checked" : ""}> Aktif</label><button class="icon-btn section-delete" type="button" title="Hapus"><i class="fas fa-trash"></i></button></div></div><div class="form-grid"><label>Jenis<select class="section-type">${SECTION_TYPES.map((type) => `<option value="${type}" ${section.type === type ? "selected" : ""}>${escapeHtml(sectionLabel(type))}</option>`).join("")}</select></label><label>Judul<input class="section-title" type="text" maxlength="160" value="${escapeHtml(c.title || "")}"></label><label class="full">Deskripsi<textarea class="section-description" rows="3" maxlength="500">${escapeHtml(c.description || "")}</textarea></label>${["serviceSchedule", "featuredEvents", "ministries"].includes(section.type) ? `<label>Batas Item<input class="section-limit" type="number" min="1" max="20" value="${Number(c.limit) || 4}"></label>` : ""}${resourcesEditor}</div></article>`;
     })
     .join("");
+
   el.querySelectorAll(".section-delete").forEach((btn) =>
     btn.addEventListener("click", () => {
       btn.closest(".editor-section")?.remove();
       syncEditorSections();
     }),
   );
+
   el.querySelectorAll(".section-type").forEach((select) =>
     select.addEventListener("change", () => {
       syncEditorSections();
+      renderEditorSections();
+    }),
+  );
+
+  el.querySelectorAll(".resource-add").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      syncEditorSections();
+      const card = btn.closest(".editor-section");
+      const sectionId = card?.dataset.editorSection;
+      const section = state.editingPage.sections.find(
+        (item) => item.id === sectionId,
+      );
+      if (!section) return;
+      section.config = section.config || {};
+      section.config.resources = Array.isArray(section.config.resources)
+        ? section.config.resources
+        : [];
+      section.config.resources.push(resourceDefaults());
+      renderEditorSections();
+    }),
+  );
+
+  el.querySelectorAll(".resource-delete").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const item = btn.closest(".resource-editor-item");
+      const card = btn.closest(".editor-section");
+      const sectionId = card?.dataset.editorSection;
+      const resourceId = item?.dataset.resourceId;
+      const section = state.editingPage.sections.find(
+        (entry) => entry.id === sectionId,
+      );
+      if (!section) return;
+      section.config = section.config || {};
+      section.config.resources = (
+        Array.isArray(section.config.resources)
+          ? section.config.resources
+          : []
+      ).filter((resource) => resource.id !== resourceId);
       renderEditorSections();
     }),
   );
@@ -319,6 +445,22 @@ function syncEditorSections() {
     if (limit)
       config.limit = Math.min(20, Math.max(1, Number(limit.value) || 4));
     else delete config.limit;
+
+    if (type === "resources") {
+      config.resources = [...card.querySelectorAll(".resource-editor-item")].map(
+        (item) => ({
+          id:
+            item.dataset.resourceId ||
+            `resource-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          type: item.querySelector(".resource-type")?.value || "link",
+          title: item.querySelector(".resource-title")?.value?.trim() || "",
+          url: item.querySelector(".resource-url")?.value?.trim() || "",
+        }),
+      );
+    } else if (old.type !== "resources") {
+      delete config.resources;
+    }
+
     return {
       ...old,
       id,
