@@ -61,7 +61,11 @@ async function main() {
     if (section.type === 'welcome') return `<section class="section"><div class="container"><span class="eyebrow">WELCOME</span><h2>${esc(c.title || 'Selamat Datang')}</h2><p>${esc(c.description || 'Kami senang menyambut Anda di website gereja kami.')}</p></div></section>`;
     if (section.type === 'featuredEvents') return `<section class="section"><div class="container"><span class="eyebrow">EVENT</span><h2>${esc(c.title || 'Event Terdekat')}</h2><div class="events-grid">${eventList.map(e => card(e.nama || 'Event Gereja', `<p>${esc(e.deskripsi || e.tipe || '')}</p><p>${esc(e.lokasi || 'Lokasi akan diumumkan')}</p>`)).join('') || '<p>Belum ada event.</p>'}</div></div></section>`;
     if (section.type === 'ministries') return `<section class="section alt"><div class="container"><span class="eyebrow">MINISTRIES</span><h2>${esc(c.title || 'Pelayanan')}</h2><p>${esc(c.description || 'Temukan pelayanan yang dapat Anda ikuti.')}</p><div class="ministries-grid">${ministryList.map(m => card(m.name || 'Pelayanan', `<p>${esc(m.description || '')}</p>${m.leader?.name ? `<p><strong>Pemimpin:</strong> ${esc(m.leader.name)}</p>` : ''}${m.schedule ? `<p><strong>Jadwal:</strong> ${esc(m.schedule)}</p>` : ''}`)).join('') || '<p>Belum ada pelayanan.</p>'}</div></div></section>`;
-    if (section.type === 'contact') return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${esc(c.title || 'Hubungi Kami')}</h2><p>${esc(config.contact?.address || '')}</p><p>${esc(config.contact?.phone || '')}</p><p>${esc(config.contact?.email || '')}</p></div></section>`;
+    if (section.type === 'contact') {
+      const mapsUrl = String(config.contact?.mapsUrl || '').trim();
+      const mapsHtml = mapsUrl ? `<p><a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer">📍 Lihat lokasi di Google Maps</a></p>` : '';
+      return `<section class="section"><div class="container"><span class="eyebrow">CONTACT</span><h2>${esc(c.title || 'Hubungi Kami')}</h2><p>${esc(config.contact?.address || '')}</p><p>${esc(config.contact?.phone || '')}</p><p>${esc(config.contact?.email || '')}</p>${mapsHtml}</div></section>`;
+    }
     if (section.type === 'serviceSchedule') return `<section class="section alt"><div class="container"><span class="eyebrow">IBADAH</span><h2>${esc(c.title || 'Jadwal Ibadah')}</h2><p>Jadwal ibadah akan ditampilkan di sini.</p></div></section>`;
     return '';
   }).join('');
