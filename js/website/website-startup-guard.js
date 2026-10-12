@@ -6,7 +6,7 @@
 import "../firebase.js";
 
 (function installWebsiteStartupGuard() {
-  const timeoutMs = 20000;
+  const timeoutMs = 30000;
   let startupSettled = false;
 
   const showStartupFailure = (message) => {
@@ -36,7 +36,7 @@ import "../firebase.js";
   window.setTimeout(() => {
     if (!startupSettled) {
       showStartupFailure(
-        "Proses Firebase/API terlalu lama (lebih dari 20 detik). Refresh halaman dan lihat Console untuk mengetahui tahap yang berhenti.",
+        "Proses Firebase/API terlalu lama (lebih dari 30 detik). Refresh halaman dan lihat Console untuk mengetahui tahap yang berhenti.",
       );
     }
   }, timeoutMs);
