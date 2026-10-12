@@ -1,3 +1,4 @@
-// Preview lifecycle is owned by website-preview-manager.js.
-// Kept as a module placeholder for backwards-compatible script loading.
-export {};
+function mapPoint(value){const raw=String(value||"");const patterns=[/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,/[?&](?:q|query)=(-?\d+(?:\.\d+)?)[,%20]+(-?\d+(?:\.\d+)?)/,/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/];for(const p of patterns){const m=raw.match(p);if(m)return{lat:Number(m[1]),lng:Number(m[2])}}return null}
+function embed(value){try{const u=new URL(String(value||""));if(!["http:","https:"].includes(u.protocol))return"";const point=mapPoint(u.href);const q=point?`${point.lat},${point.lng}`:u.href;return `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=${point?16:14}&output=embed`}catch{return""}}
+function enhanceMaps(){document.querySelectorAll(".map-preview iframe").forEach(frame=>{const raw=decodeURIComponent(frame.src||"");const match=raw.match(/[?&]q=([^&]+)/);if(!match)return;const source=match[1];const next=embed(source);if(next&&frame.src!==next)frame.src=next;frame.parentElement.style.aspectRatio="1 / 1";frame.parentElement.style.borderRadius="16px"})}
+const observer=new MutationObserver(enhanceMaps);observer.observe(document.body,{childList:true,subtree:true});window.addEventListener("message",()=>setTimeout(enhanceMaps,0));enhanceMaps();
