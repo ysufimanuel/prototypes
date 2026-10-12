@@ -7,7 +7,54 @@ let editing = null;
 const API = "/api/admin/website";
 
 const esc = v => String(v ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-async function api(path, options = {}) { if (!user) throw new Error("AUTH_REQUIRED"); const token = await user.getIdToken(true); const r = await fetch(API + path, { ...options, headers: { "Content-Type":"application/json", Authorization:`Bearer ${token}`, ...(options.headers||{}) } }); const data = await r.json().catch(()=>({})); if (!r.ok || data.success === false) throw new Error(data.message || `HTTP ${r.status}`); return data; }
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+async function api(path, options = {}) {
+  if (!user) throw new Error("AUTH_REQUIRED");
+  const token = await withTimeout(
+    user.getIdToken(),
+    15000,
+    "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.",
+  );
+  const controller = new AbortController();
+  const requestTimeout = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const r = await fetch(API + path, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.success === false)
+      throw new Error(data.message || `HTTP ${r.status}`);
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Request ${path} terlalu lama (lebih dari 20 detik).`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(requestTimeout);
+  }
+}
+
 async function loadDraft() { draft = (await api("/draft")).data; return draft; }
 function ensureMobilePublish() { if ($("website-mobile-publish")) return; const b=document.createElement("button"); b.id="website-mobile-publish"; b.className="website-publish-btn mobile-publish-floating"; b.type="button"; b.innerHTML='<i class="fas fa-cloud-upload-alt"></i><span>Publish</span>'; b.addEventListener("click", publish); document.body.appendChild(b); }
 async function publish(){try{await saveAll();const a=await api("/publish",{method:"POST",body:"{}"});await api("/publish-events",{method:"POST",body:"{}"});await api("/publish-groups",{method:"POST",body:"{}"});alert(a.message||"Website berhasil dipublikasikan.");window.dispatchEvent(new CustomEvent("cms:website-draft-updated"));}catch(e){console.error(e);alert(e.message||"Gagal mempublikasikan website.")}}
