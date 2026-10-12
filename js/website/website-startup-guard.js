@@ -1,7 +1,7 @@
 // Website Manager startup guard.
 // The main module performs Firebase/profile/provision work inside the auth callback.
 // This wrapper prevents a slow Firebase/API operation from leaving the loading screen forever.
-// Deployment marker: the final tested release is intentionally triggered by this commit message.
+// Final release marker.
 (function installWebsiteStartupGuard() {
   const originalAuthStateChanged = window.firebaseOnAuthStateChanged;
   if (typeof originalAuthStateChanged !== "function") return;
