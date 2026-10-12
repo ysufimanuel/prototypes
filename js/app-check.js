@@ -1,3 +1,5 @@
+import "./firebase.js";
+
 const APP_CHECK_SITE_KEY = "6Lc6Y-gtAAAAAOIWYAW8j66GnhgFn3vbc-xGUjI8";
 const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(
   window.location.hostname,
@@ -5,6 +7,16 @@ const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(
 
 let appCheck = null;
 let appCheckInitPromise = null;
+
+function withTimeout(promise, timeoutMs) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      timer = window.setTimeout(() => resolve(null), timeoutMs);
+    }),
+  ]).finally(() => window.clearTimeout(timer));
+}
 
 async function initializeFirebaseAppCheck() {
   if (isLocalhost || !APP_CHECK_SITE_KEY || !window.firebaseApp) {
@@ -16,7 +28,9 @@ async function initializeFirebaseAppCheck() {
   appCheckInitPromise = (async () => {
     try {
       const { initializeAppCheck, ReCaptchaEnterpriseProvider } =
-        await import("https://www.gstatic.com/firebasejs/12.10.0/firebase-app-check.js");
+        await import(
+          "https://www.gstatic.com/firebasejs/12.10.0/firebase-app-check.js"
+        );
 
       appCheck = initializeAppCheck(window.firebaseApp, {
         provider: new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
@@ -36,14 +50,14 @@ async function initializeFirebaseAppCheck() {
 }
 
 async function getFirebaseAppCheckToken(forceRefresh = false) {
-  const instance = await initializeFirebaseAppCheck();
+  const instance = await withTimeout(initializeFirebaseAppCheck(), 8000);
   if (!instance) return null;
 
   try {
     const { getToken } = await import(
       "https://www.gstatic.com/firebasejs/12.10.0/firebase-app-check.js"
     );
-    const result = await getToken(instance, forceRefresh);
+    const result = await withTimeout(getToken(instance, forceRefresh), 8000);
     return result?.token || null;
   } catch (error) {
     console.error("[APP CHECK] Token unavailable:", error);
@@ -77,6 +91,8 @@ function installAppCheckFetchInterceptor() {
       return originalFetch(input, init);
     }
 
+    // Attestation must never leave an admin request hanging forever. If it
+    // cannot be obtained, let the backend return its normal App Check error.
     const token = await getFirebaseAppCheckToken(false);
     const headers = new Headers(
       init.headers || (input instanceof Request ? input.headers : undefined),
