@@ -15,3 +15,4 @@ self.addEventListener('activate', event => {
 //
 // No fetch handler on purpose: the app is online-first and does not currently
 // maintain an offline cache, so the browser should own every network request.
+// Release marker: Website Manager loading/PWA network hardening.
