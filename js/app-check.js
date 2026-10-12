@@ -50,14 +50,14 @@ async function initializeFirebaseAppCheck() {
 }
 
 async function getFirebaseAppCheckToken(forceRefresh = false) {
-  const instance = await withTimeout(initializeFirebaseAppCheck(), 8000);
+  const instance = await withTimeout(initializeFirebaseAppCheck(), 5000);
   if (!instance) return null;
 
   try {
     const { getToken } = await import(
       "https://www.gstatic.com/firebasejs/12.10.0/firebase-app-check.js"
     );
-    const result = await withTimeout(getToken(instance, forceRefresh), 8000);
+    const result = await withTimeout(getToken(instance, forceRefresh), 7000);
     return result?.token || null;
   } catch (error) {
     console.error("[APP CHECK] Token unavailable:", error);
