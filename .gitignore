@@ -11,5 +11,5 @@ firestore-debug*.log
 .env.*
 .vercel/
 .DS_Store
-tets/
+tests/
 Thumbs.db
