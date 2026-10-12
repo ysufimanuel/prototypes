@@ -1,6 +1,7 @@
 // Website Manager startup guard.
 // Firebase is a top-level-await module, so import it here before installing the auth wrapper.
 // The watchdog also runs independently so profile/provision/draft failures cannot leave the page stuck forever.
+// Final release marker.
 import "../firebase.js";
 
 (function installWebsiteStartupGuard() {
