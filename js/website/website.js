@@ -108,21 +108,58 @@ function resourceTypeLabel(type) {
   );
 }
 
+async function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function api(path, options = {}) {
   if (!state.user) throw new Error("AUTH_REQUIRED");
-  const token = await state.user.getIdToken(true);
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
-    },
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.success === false)
-    throw new Error(data.message || `HTTP ${response.status}`);
-  return data;
+
+  console.log(`[WEBSITE] API ${path}: requesting Firebase ID token`);
+  // Do not force a token refresh on every API call. Firebase Auth already
+  // refreshes expired tokens when needed; forcing it here can leave startup
+  // waiting indefinitely on the securetoken endpoint.
+  const token = await withTimeout(
+    state.user.getIdToken(),
+    15000,
+    "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.",
+  );
+  console.log(`[WEBSITE] API ${path}: Firebase ID token ready`);
+
+  const controller = new AbortController();
+  const requestTimeout = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {}),
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false)
+      throw new Error(data.message || `HTTP ${response.status}`);
+    return data;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Request ${path} terlalu lama (lebih dari 20 detik).`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(requestTimeout);
+  }
 }
 
 function switchSection(section) {
