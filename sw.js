@@ -8,8 +8,10 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-// Online-first PWA: Firebase Auth/Firestore and all API/data requests are never cached.
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(fetch(event.request));
-});
+// Keep the service worker intentionally passive for the CMS shell.
+// Firebase Auth/Firestore, API requests, the manifest, and any external
+// resources must be handled directly by the browser. Intercepting every GET
+// here can turn Vercel auth redirects into opaque/CORS failures.
+//
+// No fetch handler on purpose: the app is online-first and does not currently
+// maintain an offline cache, so the browser should own every network request.
