@@ -8,3 +8,8 @@ firestore-debug*.log
 *.pem
 *.key
 .firebase/
+.env.*
+.vercel/
+.DS_Store
+tests/
+Thumbs.db
