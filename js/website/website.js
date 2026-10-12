@@ -583,22 +583,50 @@ function bindUI() {
   });
 }
 
-onAuthStateChanged(auth, async (user) => {
-  try {
-    if (!user) {
-      window.location.href = "index.html";
-      return;
+function showStartupError(message) {
+  console.error("[WEBSITE] startup failed:", message);
+  hide("website-loading");
+  show("website-access-denied");
+  setText("website-access-denied", message);
+}
+
+if (!auth || !db || typeof onAuthStateChanged !== "function") {
+  showStartupError(
+    "Gagal memuat autentikasi Firebase. Refresh halaman. Jika masih gagal, buka Console untuk melihat error Firebase.",
+  );
+} else {
+  let authResolved = false;
+  const authTimeout = window.setTimeout(() => {
+    if (authResolved) return;
+    showStartupError(
+      "Autentikasi terlalu lama dimuat. Pastikan koneksi internet aktif lalu refresh halaman.",
+    );
+  }, 15000);
+
+  onAuthStateChanged(auth, async (user) => {
+    authResolved = true;
+    window.clearTimeout(authTimeout);
+    try {
+      if (!user) {
+        window.location.href = "index.html";
+        return;
+      }
+      await loadProfile(user);
+      await provision();
+      bindUI();
+      hide("website-loading");
+      show("website-manager");
+    } catch (err) {
+      console.error("[WEBSITE] access check failed:", err);
+      hide("website-loading");
+      show("website-access-denied");
+      if (err.message === "ROLE_NOT_ALLOWED")
+        setText("website-access-denied", "Akses Ditolak");
+      else
+        setText(
+          "website-access-denied",
+          err.message || "Gagal memuat Website Manager.",
+        );
     }
-    await loadProfile(user);
-    await provision();
-    bindUI();
-    hide("website-loading");
-    show("website-manager");
-  } catch (err) {
-    console.error("[WEBSITE] access check failed:", err);
-    hide("website-loading");
-    show("website-access-denied");
-    if (err.message === "ROLE_NOT_ALLOWED")
-      setText("website-access-denied", "Akses Ditolak");
-  }
-});
+  });
+}
