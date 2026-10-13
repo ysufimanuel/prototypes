@@ -2,7 +2,7 @@ import "../firebase.js";
 
 const auth = window.auth;
 const db = window.db;
-const onAuthStateChanged = window.firebaseOnAuthStateChanged;
+const getAuthStateChanged = () => window.firebaseOnAuthStateChanged;
 const firebaseLogout = () => window.logoutFromFirebase?.();
 
 const $ = (id) => document.getElementById(id);
@@ -626,6 +626,8 @@ function showStartupError(message) {
   show("website-access-denied");
   setText("website-access-denied", message);
 }
+
+const onAuthStateChanged = getAuthStateChanged();
 
 if (!auth || !db || typeof onAuthStateChanged !== "function") {
   showStartupError(
