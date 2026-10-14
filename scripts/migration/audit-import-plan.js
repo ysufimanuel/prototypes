@@ -54,17 +54,20 @@ const TENANT_ID_TABLES = new Set([
   'notifications', 'deaths', 'website_pages', 'public_site_pages', 'public_site_events',
 ]);
 
+// Only tables whose database schema enforces a composite primary/unique relationship
+// belong here. Event participation and attendance are intentionally excluded because
+// multiple rows for the same event/member pair can represent distinct registrations
+// or attendance dates/records.
 const JUNCTION_KEYS = {
   family_members: ['church_legacy_id', 'family_legacy_id', 'member_legacy_id'],
   group_members: ['church_legacy_id', 'group_legacy_id', 'member_legacy_id'],
-  event_participants: ['church_legacy_id', 'event_legacy_id', 'member_legacy_id'],
-  attendance: ['church_legacy_id', 'event_legacy_id', 'member_legacy_id'],
-  assignments: ['church_legacy_id', 'volunteer_legacy_id', 'event_legacy_id'],
   notification_recipients: ['church_legacy_id', 'notification_legacy_id', 'user_legacy_uid'],
 };
 
 function countRows(sourceCollections, planTables, name) {
-  const source = rows(sourceCollections, name).length;
+  // profiles are generated from the root users collection in the transform stage.
+  const sourceName = name === 'profiles' ? 'users' : name;
+  const source = rows(sourceCollections, sourceName).length;
   const planned = Array.isArray(planTables?.[name]) ? planTables[name].length : 0;
   return { source, planned };
 }
