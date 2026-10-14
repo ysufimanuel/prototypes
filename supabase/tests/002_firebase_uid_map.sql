@@ -39,22 +39,22 @@ select throws_ok(
   '42501', null,
   'authenticated cannot insert firebase UID mappings'
 );
+
+-- Data-modifying statements must be top-level in PostgreSQL. Execute them as
+-- standalone statements, then assert that RLS filtered them to zero rows.
+update public.firebase_uid_map
+set legacy_uid='blocked-update'
+where legacy_uid='firebase-test-legacy-uid';
 select is(
-  (with changed as (
-    update public.firebase_uid_map
-    set legacy_uid='blocked-update'
-    where legacy_uid='firebase-test-legacy-uid'
-    returning *
-  ) select count(*) from changed),
+  (select count(*) from public.firebase_uid_map where legacy_uid='blocked-update'),
   0::bigint,
   'authenticated cannot update firebase UID mappings'
 );
+
+delete from public.firebase_uid_map
+where legacy_uid='firebase-test-legacy-uid';
 select is(
-  (with removed as (
-    delete from public.firebase_uid_map
-    where legacy_uid='firebase-test-legacy-uid'
-    returning *
-  ) select count(*) from removed),
+  (select count(*) from public.firebase_uid_map where legacy_uid='firebase-test-legacy-uid'),
   0::bigint,
   'authenticated cannot delete firebase UID mappings'
 );
