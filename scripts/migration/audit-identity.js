@@ -4,12 +4,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const DEFAULT_MAP_PATH = path.resolve(__dirname, 'legacy-user-map.json');
+
 function parseArgs(argv) {
-  const args = { input: null, output: null };
+  const args = { input: null, output: null, map: DEFAULT_MAP_PATH };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === '--input') args.input = argv[++i];
     else if (value === '--output') args.output = path.resolve(argv[++i]);
+    else if (value === '--map') args.map = path.resolve(argv[++i]);
     else if (value === '--help' || value === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${value}`);
   }
@@ -17,7 +20,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`Usage: node scripts/migration/audit-identity.js --input .migration-data-v4.json [--output .migration-identity-audit.json]`);
+  console.log(`Usage: node scripts/migration/audit-identity.js --input .migration-data-v4.json [--output .migration-identity-audit.json] [--map scripts/migration/legacy-user-map.json]`);
 }
 
 function asString(value) {
@@ -40,6 +43,33 @@ function rowsByKey(rows, key) {
   return result;
 }
 
+function loadLegacyUserMap(mapPath) {
+  if (!fs.existsSync(mapPath)) return new Map();
+  const payload = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+  const mappings = Array.isArray(payload?.mappings) ? payload.mappings : [];
+  const result = new Map();
+  for (const mapping of mappings) {
+    const churchId = asString(mapping?.church_legacy_id);
+    const legacyRef = asString(mapping?.legacy_user_ref);
+    const firebaseUid = asString(mapping?.firebase_uid);
+    if (!churchId || !legacyRef || !firebaseUid) {
+      throw new Error(`Invalid legacy user mapping in ${mapPath}`);
+    }
+    const key = `${churchId}:${legacyRef}`;
+    if (result.has(key) && result.get(key).firebase_uid !== firebaseUid) {
+      throw new Error(`Conflicting legacy user mapping for ${key}`);
+    }
+    result.set(key, {
+      church_legacy_id: churchId,
+      legacy_user_ref: legacyRef,
+      firebase_uid: firebaseUid,
+      confidence: mapping.confidence ?? 'unspecified',
+      reason: mapping.reason ?? null,
+    });
+  }
+  return result;
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -58,18 +88,22 @@ function main() {
   const users = Array.isArray(collections.users) ? collections.users : [];
   const userByUid = rowsByKey(users, 'legacy_uid');
   const userUids = new Set(userByUid.keys());
+  const legacyUserMap = loadLegacyUserMap(args.map);
 
   const report = {
     input: inputPath,
+    legacyUserMap: args.map,
     summary: {
       users: users.length,
       knownFirebaseUids: userUids.size,
+      configuredLegacyUserMappings: legacyUserMap.size,
       unresolvedFirebaseUidRefs: 0,
       unresolvedLegacyUserRefs: 0,
       crossTenantIdentityRefs: 0,
     },
     firebaseUidReferences: [],
     legacyUserReferences: [],
+    resolvedLegacyUserReferences: [],
     crossTenantReferences: [],
     notes: [],
   };
@@ -167,14 +201,60 @@ function main() {
               }
             }
           } else {
-            report.summary.unresolvedLegacyUserRefs += 1;
-            report.legacyUserReferences.push({
-              table,
-              field,
-              value,
-              church_legacy_id: churchId,
-              row_legacy_id: asString(row.legacy_id),
-            });
+            const mapping = legacyUserMap.get(`${churchId}:${value}`);
+            if (mapping) {
+              const mappedUsers = userByUid.get(mapping.firebase_uid) || [];
+              if (!mappedUsers.length) {
+                report.summary.unresolvedLegacyUserRefs += 1;
+                report.legacyUserReferences.push({
+                  table,
+                  field,
+                  value,
+                  church_legacy_id: churchId,
+                  row_legacy_id: asString(row.legacy_id),
+                  mapping_error: 'Mapped Firebase UID is not present in collections.users',
+                  mapped_firebase_uid: mapping.firebase_uid,
+                });
+              } else {
+                const tenantMismatch = mappedUsers.some((user) => {
+                  const userChurch = asString(user.church_legacy_id);
+                  return churchId && userChurch && churchId !== userChurch;
+                });
+                if (tenantMismatch) {
+                  report.summary.crossTenantIdentityRefs += 1;
+                  report.crossTenantReferences.push({
+                    type: 'mapped_legacy_user_ref',
+                    table,
+                    field,
+                    value,
+                    row_legacy_id: asString(row.legacy_id),
+                    row_church_legacy_id: churchId,
+                    mapped_firebase_uid: mapping.firebase_uid,
+                    user_church_legacy_ids: mappedUsers.map((user) => asString(user.church_legacy_id)),
+                  });
+                } else {
+                  report.resolvedLegacyUserReferences.push({
+                    table,
+                    field,
+                    value,
+                    church_legacy_id: churchId,
+                    row_legacy_id: asString(row.legacy_id),
+                    firebase_uid: mapping.firebase_uid,
+                    confidence: mapping.confidence,
+                    reason: mapping.reason,
+                  });
+                }
+              }
+            } else {
+              report.summary.unresolvedLegacyUserRefs += 1;
+              report.legacyUserReferences.push({
+                table,
+                field,
+                value,
+                church_legacy_id: churchId,
+                row_legacy_id: asString(row.legacy_id),
+              });
+            }
           }
         }
 
@@ -219,15 +299,17 @@ function main() {
 
   for (const [table, rows] of Object.entries(collections)) inspectRows(table, rows);
 
-  report.notes.push({
-    type: 'manual_resolution_required',
-    fields: [
-      'announcements.author_legacy_ref',
-      'income_transactions.approved_by_legacy_ref',
-      'expense_transactions.approved_by_legacy_ref',
-      'approval_history.by_legacy_ref',
-    ],
-  });
+  if (report.summary.unresolvedLegacyUserRefs > 0) {
+    report.notes.push({
+      type: 'manual_resolution_required',
+      fields: [
+        'announcements.author_legacy_ref',
+        'income_transactions.approved_by_legacy_ref',
+        'expense_transactions.approved_by_legacy_ref',
+        'approval_history.by_legacy_ref',
+      ],
+    });
+  }
   report.notes.push({
     type: 'firebase_uid_map_required',
     reason: 'Every legacy Firebase Auth UID must map to a real Supabase auth.users.id before profiles/messages/notifications are imported.',
@@ -238,6 +320,8 @@ function main() {
 
   console.log('Migration identity audit complete.');
   console.log(`Users / Firebase UIDs: ${report.summary.users} / ${report.summary.knownFirebaseUids}`);
+  console.log(`Configured legacy user mappings: ${report.summary.configuredLegacyUserMappings}`);
+  console.log(`Resolved legacy user refs: ${report.resolvedLegacyUserReferences.length}`);
   console.log(`Unresolved Firebase UID refs: ${report.summary.unresolvedFirebaseUidRefs}`);
   console.log(`Unresolved legacy user refs: ${report.summary.unresolvedLegacyUserRefs}`);
   console.log(`Cross-tenant identity refs: ${report.summary.crossTenantIdentityRefs}`);
