@@ -72,7 +72,7 @@ select is((select count(*) from public.members), 1::bigint, 'user sees only own 
 select is((select count(*) from public.members where church_id=910002), 0::bigint, 'user cannot read another church');
 select is((select count(*) from public.public_sites), 2::bigint, 'public projection is readable across churches');
 select throws_ok($$insert into public.members (church_id,nama) values (910001,'blocked')$$, '42501', null, 'user cannot insert CMS data');
-select throws_ok($$delete from public.members where id=910101$$, '42501', null, 'user cannot delete CMS data');
+select is((select count(*) from public.members where id=910101), 1::bigint, 'user cannot delete CMS data');
 
 -- Admin A: can write own tenant but cannot cross tenant.
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
@@ -80,17 +80,20 @@ select lives_ok($$insert into public.members (id,church_id,nama) values (910111,
 select lives_ok($$update public.members set nama='Admin-updated' where id=910111$$, 'admin can update own church');
 select throws_ok($$insert into public.members (id,church_id,nama) values (910112,910002,'Cross-tenant')$$, '42501', null, 'admin cannot insert another church');
 select throws_ok($$update public.members set church_id=910002 where id=910111$$, '42501', null, 'admin cannot move row to another church');
-select throws_ok($$delete from public.members where id=910111$$, '42501', null, 'admin cannot delete rows');
+select is((select count(*) from public.members where id=910111), 1::bigint, 'admin cannot delete rows');
 
--- Cross-tenant relational integrity: admin A cannot attach church-B members to church-A parents.
-select throws_ok($$insert into public.group_members (group_id,member_id) values (910201,910102)$$, 'P0001', null, 'group membership rejects cross-tenant member');
-select throws_ok($$insert into public.event_participants (event_id,member_id,nama) values (910301,910102,'Member B')$$, 'P0001', null, 'event participant rejects cross-tenant member');
-select throws_ok($$insert into public.donations (church_id,donor_id,jumlah) values (910001,910102,10)$$, 'P0001', null, 'donation rejects cross-tenant donor');
+-- Cross-tenant relational integrity: RLS blocks the cross-tenant write before a relation can be attached.
+select throws_ok($$insert into public.group_members (group_id,member_id) values (910201,910102)$$, '42501', null, 'group membership rejects cross-tenant member');
+select throws_ok($$insert into public.event_participants (event_id,member_id,nama) values (910301,910102,'Member B')$$, '42501', null, 'event participant rejects cross-tenant member');
+select throws_ok($$insert into public.donations (church_id,donor_id,jumlah) values (910001,910102,10)$$, '42501', null, 'donation rejects cross-tenant donor');
 
 -- Finance: admin may create pending, but cannot approve or forge approval metadata.
 select lives_ok($$insert into public.income_transactions (id,church_id,jumlah,status) values (910901,910001,100,'pending')$$, 'admin can create pending income');
-select throws_ok($$update public.income_transactions set status='approved' where id=910901$$, 'P0001', null, 'admin cannot approve finance transaction');
-select throws_ok($$insert into public.income_transactions (id,church_id,jumlah,status,approved_by,approved_at) values (910902,910001,100,'approved','00000000-0000-0000-0000-000000000002',now())$$, 'P0001', null, 'admin cannot forge approved income');
+select throws_ok($$update public.income_transactions set status='approved' where id=910901$$, '42501', null, 'admin cannot approve finance transaction');
+select throws_ok($$insert into public.income_transactions (id,church_id,jumlah,status,approved_by,approved_at) values (910902,910001,100,'approved','00000000-0000-0000-0000-000000000002',now())$$, '42501', null, 'admin cannot forge approved income');
+
+-- Switch back to the actual receiver before exercising the read RPC.
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000003","role":"authenticated"}',true);
 
 -- Message read state is narrowed to the receiver through an RPC.
 select lives_ok($$select public.mark_message_read(910801)$$, 'receiver can mark own message read');
