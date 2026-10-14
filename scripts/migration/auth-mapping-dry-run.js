@@ -32,9 +32,7 @@ for (const user of users) {
     continue;
   }
 
-  if (seenLegacy.has(legacyUid)) {
-    duplicateLegacyUids.push(legacyUid);
-  }
+  if (seenLegacy.has(legacyUid)) duplicateLegacyUids.push(legacyUid);
   seenLegacy.add(legacyUid);
 
   if (!email) {
@@ -55,9 +53,10 @@ const rows = users.map((user) => ({
   username: user.username || null,
   nama: user.nama || null,
   role: user.role || 'user',
+  status: user.status || null,
   church_legacy_id: user.churchId || null,
   auth_user_id: null,
-  status: 'PENDING_AUTH_CREATION',
+  status_mapping: 'PENDING_AUTH_CREATION',
 }));
 
 const result = {
@@ -65,7 +64,7 @@ const result = {
     source: dataset?.meta?.source || 'firebase-backup',
     generatedAt: new Date().toISOString(),
     tool: 'auth-mapping-dry-run',
-    version: '1.0.0',
+    version: '1.1.0',
   },
   summary: {
     users: users.length,
@@ -91,6 +90,4 @@ console.log(`duplicate legacy UIDs: ${result.summary.duplicateLegacyUids}`);
 console.log(`duplicate emails: ${result.summary.duplicateEmails}`);
 console.log(`invalid rows: ${result.summary.invalidRows}`);
 
-if (duplicateLegacyUids.length || duplicateEmails.length || invalidRows.length) {
-  process.exitCode = 2;
-}
+if (duplicateLegacyUids.length || duplicateEmails.length || invalidRows.length) process.exitCode = 2;
