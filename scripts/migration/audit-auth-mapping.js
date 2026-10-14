@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+'use strict';
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const args = process.argv.slice(2);
 
@@ -12,7 +13,24 @@ function argValue(name) {
 }
 
 function printHelp() {
-  console.log(`Usage:\n  node scripts/migration/audit-auth-mapping.js --mapping <file> [--plan <file>]\n\nChecks the Firebase UID -> Supabase Auth UUID mapping before live migration.\n\nRequired mapping shape:\n{\n  "version": 1,\n  "mappings": [\n    {\n      "firebase_uid": "legacy-firebase-uid",\n      "auth_user_id": "supabase-auth-uuid"\n    }\n  ]\n}\n\nThe mapping file must contain real Supabase auth.users UUIDs. Do not invent UUIDs.\n`);
+  console.log(`Usage:
+  node scripts/migration/audit-auth-mapping.js --mapping <file> [--input <file>] [--plan <file>]
+
+Checks the Firebase UID -> Supabase Auth UUID mapping before live migration.
+
+Required mapping shape:
+{
+  "version": 1,
+  "mappings": [
+    {
+      "firebase_uid": "legacy-firebase-uid",
+      "auth_user_id": "supabase-auth-uuid"
+    }
+  ]
+}
+
+The mapping file must contain real Supabase auth.users UUIDs. Do not invent UUIDs.
+`);
 }
 
 if (args.includes('--help') || args.includes('-h')) {
@@ -21,6 +39,7 @@ if (args.includes('--help') || args.includes('-h')) {
 }
 
 const mappingFile = argValue('--mapping');
+const inputFile = argValue('--input') || '.migration-data-v4.json';
 const planFile = argValue('--plan') || '.migration-import-plan.json';
 
 if (!mappingFile) {
@@ -31,9 +50,7 @@ if (!mappingFile) {
 
 function readJson(file) {
   const absolute = path.resolve(file);
-  if (!fs.existsSync(absolute)) {
-    throw new Error(`File not found: ${absolute}`);
-  }
+  if (!fs.existsSync(absolute)) throw new Error(`File not found: ${absolute}`);
   return JSON.parse(fs.readFileSync(absolute, 'utf8'));
 }
 
@@ -55,25 +72,26 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+const errors = [];
+const warnings = [];
+
 function fail(message) {
   errors.push(message);
 }
 
-const errors = [];
-const warnings = [];
-
 try {
+  const source = readJson(inputFile);
   const plan = readJson(planFile);
   const mappingDocument = readJson(mappingFile);
   const mappings = asArray(mappingDocument);
+  const users = Array.isArray(source?.collections?.users) ? source.collections.users : [];
 
-  if (!mappings.length) {
-    fail('Mapping file contains no mappings.');
-  }
+  if (!users.length) fail('Migration dataset contains no users.');
+  if (!mappings.length) fail('Mapping file contains no mappings.');
 
+  const sourceFirebaseUids = setFrom(users.map((row) => row?.legacy_uid));
   const firebaseToAuth = new Map();
   const authToFirebase = new Map();
-  const mappingRows = new Map();
 
   for (const [index, row] of mappings.entries()) {
     const rowNumber = index + 1;
@@ -101,61 +119,36 @@ try {
 
     firebaseToAuth.set(firebaseUid, authUserId);
     authToFirebase.set(authUserId, firebaseUid);
-    mappingRows.set(firebaseUid, row);
   }
-
-  const expectedFirebaseUids = setFrom([
-    ...(plan.profiles || []).map((row) => row.firebase_uid || row.legacy_uid),
-    ...(plan.resolvedLegacyUserRefs || []).map((row) => row.firebase_uid),
-  ]);
 
   const mappedFirebaseUids = new Set(firebaseToAuth.keys());
-  const missing = diffSet(expectedFirebaseUids, mappedFirebaseUids);
-  const unexpected = diffSet(mappedFirebaseUids, expectedFirebaseUids);
+  const missing = diffSet(sourceFirebaseUids, mappedFirebaseUids);
+  const unexpected = diffSet(mappedFirebaseUids, sourceFirebaseUids);
 
-  if (missing.length) {
-    fail(`missing Auth mapping for Firebase UIDs: ${missing.join(', ')}`);
-  }
+  if (missing.length) fail(`missing Auth mapping for Firebase UIDs: ${missing.join(', ')}`);
+  if (unexpected.length) warnings.push(`mapping contains Firebase UIDs not present in source users: ${unexpected.join(', ')}`);
 
-  if (unexpected.length) {
-    warnings.push(`mapping contains Firebase UIDs not referenced by the import plan: ${unexpected.join(', ')}`);
-  }
-
-  const resolvedRefs = plan.resolvedLegacyUserRefs || [];
-  const unresolvedPlanRefs = resolvedRefs.filter((row) => {
+  const resolvedRefs = Array.isArray(plan?.resolvedLegacyUserRefs) ? plan.resolvedLegacyUserRefs : [];
+  const unresolvedRefs = resolvedRefs.filter((row) => {
     const firebaseUid = row?.firebase_uid == null ? '' : String(row.firebase_uid).trim();
     return firebaseUid && !firebaseToAuth.has(firebaseUid);
   });
 
-  if (unresolvedPlanRefs.length) {
-    fail(`resolved legacy user refs without Auth mapping: ${unresolvedPlanRefs.length}`);
+  if (unresolvedRefs.length) {
+    fail(`resolved legacy user refs without Auth mapping: ${unresolvedRefs.length}`);
   }
 
-  const profiles = plan.profiles || [];
-  const profilesWithoutAuthMapping = profiles.filter((row) => {
-    const firebaseUid = row.firebase_uid || row.legacy_uid;
-    return firebaseUid && !firebaseToAuth.has(String(firebaseUid));
-  });
-
-  if (profilesWithoutAuthMapping.length) {
-    fail(`profiles without Auth mapping: ${profilesWithoutAuthMapping.length}`);
-  }
-
-  const mappedProfileUuids = new Set();
-  for (const profile of profiles) {
-    const firebaseUid = profile.firebase_uid || profile.legacy_uid;
-    const authUserId = firebaseToAuth.get(String(firebaseUid));
-    if (authUserId) mappedProfileUuids.add(authUserId);
-  }
+  const mappedSourceUsers = users.filter((row) => firebaseToAuth.has(String(row.legacy_uid))).length;
 
   console.log('Supabase Auth mapping audit');
   console.log(`Mapping file: ${path.resolve(mappingFile)}`);
+  console.log(`Source users: ${path.resolve(inputFile)}`);
   console.log(`Import plan: ${path.resolve(planFile)}`);
-  console.log(`Firebase UIDs expected: ${expectedFirebaseUids.size}`);
+  console.log(`Firebase UIDs expected: ${sourceFirebaseUids.size}`);
   console.log(`Firebase UIDs mapped: ${mappedFirebaseUids.size}`);
   console.log(`Supabase Auth UUIDs mapped: ${authToFirebase.size}`);
-  console.log(`Profiles covered: ${mappedProfileUuids.size}/${profiles.length}`);
-  console.log(`Resolved legacy user refs covered: ${resolvedRefs.length - unresolvedPlanRefs.length}/${resolvedRefs.length}`);
+  console.log(`Source users covered: ${mappedSourceUsers}/${users.length}`);
+  console.log(`Resolved legacy user refs covered: ${resolvedRefs.length - unresolvedRefs.length}/${resolvedRefs.length}`);
 
   if (errors.length) {
     console.error(`FAIL: ${errors.length} error(s)`);
