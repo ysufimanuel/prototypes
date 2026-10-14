@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap;
 
-select plan(24);
+select plan(23);
 
 -- Deterministic fixtures. The test transaction is rolled back at the end.
 insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at)
