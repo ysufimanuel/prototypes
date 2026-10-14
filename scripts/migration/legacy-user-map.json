@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "mappings": [
+    {
+      "church_legacy_id": "mA32wi18aM7cMNjzcP7a",
+      "legacy_user_ref": "1",
+      "firebase_uid": "7kTE3E9lbAN4D5rS4XTVaN1HoeC3",
+      "confidence": "verified-by-historical-data",
+      "reason": "The GBI legacy approval/author reference is 1; the current GBI superadmin UID is the same identity used by all later approvalHistory and approvedBy records."
+    }
+  ]
+}
