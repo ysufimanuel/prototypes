@@ -43,6 +43,12 @@ function uniqueValues(rows, field) {
   return [...counts.entries()].filter(([, count]) => count > 1).map(([value]) => value);
 }
 
+function identityField(collectionName) {
+  if (collectionName === 'users') return 'legacy_uid';
+  if (collectionName === 'siteSlugs') return 'slug';
+  return 'legacy_id';
+}
+
 function runValidation(dataset) {
   const errors = [];
   const warnings = [];
@@ -64,20 +70,21 @@ function runValidation(dataset) {
       continue;
     }
 
+    const identity = identityField(name);
     const seen = new Set();
     for (const row of rows) {
       if (!row || typeof row !== 'object' || Array.isArray(row)) {
         errors.push(`${name}: row must be an object.`);
         continue;
       }
-      if (!row.legacy_id) {
-        errors.push(`${name}: row is missing legacy_id.`);
+      if (!row[identity]) {
+        errors.push(`${name}: row is missing ${identity}.`);
         continue;
       }
-      if (seen.has(row.legacy_id)) {
-        errors.push(`${name}: duplicate legacy_id '${row.legacy_id}'.`);
+      if (seen.has(row[identity])) {
+        errors.push(`${name}: duplicate ${identity} '${row[identity]}'.`);
       }
-      seen.add(row.legacy_id);
+      seen.add(row[identity]);
     }
   }
 
@@ -88,8 +95,8 @@ function runValidation(dataset) {
   const publicSites = collections.publicSites || [];
 
   const churchIds = new Set(churches.map((row) => row.legacy_id));
-  const userIds = new Set(users.map((row) => row.legacy_uid || row.legacy_id));
-  const userById = new Map(users.map((row) => [row.legacy_uid || row.legacy_id, row]));
+  const userIds = new Set(users.map((row) => row.legacy_uid));
+  const userById = new Map(users.map((row) => [row.legacy_uid, row]));
   const slugToChurch = new Map();
 
   for (const church of churches) {
@@ -134,7 +141,7 @@ function runValidation(dataset) {
   }
 
   for (const user of users) {
-    const uid = user.legacy_uid || user.legacy_id;
+    const uid = user.legacy_uid;
     if (!uid) {
       errors.push('users: row is missing legacy_uid.');
       continue;
@@ -235,7 +242,7 @@ function main() {
     meta: {
       source: args.input,
       generated_at: new Date().toISOString(),
-      validator_version: 2,
+      validator_version: 3,
     },
     result: errors.length ? 'FAIL' : 'PASS',
     errors,
