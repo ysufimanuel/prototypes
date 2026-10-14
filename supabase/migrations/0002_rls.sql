@@ -108,7 +108,6 @@ create policy approval_history_insert_superadmin on public.approval_history for 
 create policy approval_history_delete_superadmin on public.approval_history for delete using (church_id = public.current_church_id() and public.is_superadmin());
 
 -- Communication.
-create policy announcements_select on public.announcements for select using (church_id = public.current_church_id());
 create policy notifications_select on public.notifications for select using (church_id = public.current_church_id());
 create policy notifications_insert_admin on public.notifications for insert with check (church_id = public.current_church_id() and public.is_admin_or_superadmin());
 create policy notifications_delete_superadmin on public.notifications for delete using (church_id = public.current_church_id() and public.is_superadmin());
