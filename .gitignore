@@ -14,3 +14,7 @@ firestore-debug*.log
 tests/node_modules/
 tests/
 Thumbs.db
+
+# Local migration artifacts / exported data
+supabase/.migration-data.json
+supabase/.migration-data.*.json
