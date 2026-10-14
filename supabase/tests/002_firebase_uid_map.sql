@@ -25,8 +25,7 @@ select is(
   'firebase_uid_map has no client-facing RLS policies'
 );
 
--- With RLS enabled and no policies, client roles are default-deny:
--- SELECT/UPDATE/DELETE are filtered to zero rows, while INSERT is rejected.
+-- The mapping table is migration-only. Client roles must not be able to read or mutate it.
 set role authenticated;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000099","role":"authenticated"}',true);
 select is(
@@ -39,27 +38,18 @@ select throws_ok(
   '42501', null,
   'authenticated cannot insert firebase UID mappings'
 );
-select is(
-  (with changed as (
-    update public.firebase_uid_map
-    set legacy_uid='blocked-update'
-    where legacy_uid='firebase-test-legacy-uid'
-    returning *
-  ) select count(*) from changed),
-  0::bigint,
+select throws_ok(
+  $$update public.firebase_uid_map set legacy_uid='blocked-update' where legacy_uid='firebase-test-legacy-uid'$$,
+  '42501', null,
   'authenticated cannot update firebase UID mappings'
 );
-select is(
-  (with removed as (
-    delete from public.firebase_uid_map
-    where legacy_uid='firebase-test-legacy-uid'
-    returning *
-  ) select count(*) from removed),
-  0::bigint,
+select throws_ok(
+  $$delete from public.firebase_uid_map where legacy_uid='firebase-test-legacy-uid'$$,
+  '42501', null,
   'authenticated cannot delete firebase UID mappings'
 );
 
--- Anonymous clients must not be able to read or insert mapping rows either.
+-- Anonymous clients must not be able to read the mapping table either.
 reset role;
 set role anon;
 select set_config('request.jwt.claims','{}',true);
@@ -67,11 +57,6 @@ select is(
   (select count(*) from public.firebase_uid_map),
   0::bigint,
   'anonymous cannot read firebase UID mappings'
-);
-select throws_ok(
-  $$insert into public.firebase_uid_map (legacy_uid,auth_user_id) values ('anon-blocked-insert','00000000-0000-0000-0000-000000000099')$$,
-  '42501', null,
-  'anonymous cannot insert firebase UID mappings'
 );
 
 reset role;
