@@ -1,34 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * Firebase -> Supabase Auth migration helper.
+ * Firebase -> Supabase Auth migration preflight.
  *
- * This script is intentionally NOT an execution script yet.
- * It validates the auth migration contract and emits the exact rows that
- * a future service-role importer must create.
- *
- * Why this is separate from the live importer:
- * - Firebase backup contains no password hashes.
- * - Supabase auth.users must be created with Supabase UUIDs.
- * - We must map every legacy Firebase UID before importing dependent rows.
- * - No secret/service-role key should ever be committed to the repository.
+ * This script intentionally does NOT create Supabase Auth users yet.
+ * It consumes the existing auth-mapping dry-run artifact and verifies that
+ * the rows are ready for the future service-role importer.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
-const inputPath = path.join(root, '.auth-migration-dry-run.json');
+const inputPath = path.join(root, '.auth-mapping-dry-run.json');
 const outputPath = path.join(root, '.auth-migration-plan.json');
 
 if (!fs.existsSync(inputPath)) {
-  console.error(`Auth migration dry-run not found: ${inputPath}`);
+  console.error(`Auth mapping dry-run not found: ${inputPath}`);
   console.error('Run: node scripts/migration/auth-mapping-dry-run.js');
   process.exit(1);
 }
 
 const input = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-const rows = input?.rows ?? [];
+const rows = Array.isArray(input?.rows) ? input.rows : [];
 
 const errors = [];
 const seenUids = new Set();
@@ -67,7 +61,7 @@ const planned = rows.map((row, index) => {
 const plan = {
   generated_at: new Date().toISOString(),
   execution_enabled: false,
-  source: '.auth-migration-dry-run.json',
+  source: '.auth-mapping-dry-run.json',
   total_users: planned.length,
   unique_legacy_uids: seenUids.size,
   unique_emails: seenEmails.size,
