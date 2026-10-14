@@ -50,8 +50,12 @@ function main() {
 
   const inputPath = path.resolve(args.input);
   const dataset = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
+  const collections = dataset?.collections;
+  if (!collections || typeof collections !== 'object' || Array.isArray(collections)) {
+    throw new Error('Migration dataset is missing the collections object.');
+  }
 
-  const users = Array.isArray(dataset.users) ? dataset.users : [];
+  const users = Array.isArray(collections.users) ? collections.users : [];
   const userByUid = rowsByKey(users, 'legacy_uid');
   const userUids = new Set(userByUid.keys());
 
@@ -96,7 +100,7 @@ function main() {
   ]);
 
   const tableTenant = new Map();
-  for (const [table, rows] of Object.entries(dataset)) {
+  for (const [table, rows] of Object.entries(collections)) {
     if (!Array.isArray(rows)) continue;
     for (const row of rows) {
       const legacyId = asString(row?.legacy_id);
@@ -118,13 +122,27 @@ function main() {
           const known = userByUid.get(value) || [];
           if (!known.length) {
             report.summary.unresolvedFirebaseUidRefs += 1;
-            report.firebaseUidReferences.push({ table, field, value, church_legacy_id: churchId, row_legacy_id: asString(row.legacy_id) });
+            report.firebaseUidReferences.push({
+              table,
+              field,
+              value,
+              church_legacy_id: churchId,
+              row_legacy_id: asString(row.legacy_id),
+            });
           } else {
             for (const user of known) {
               const userChurch = asString(user.church_legacy_id);
               if (churchId && userChurch && churchId !== userChurch) {
                 report.summary.crossTenantIdentityRefs += 1;
-                report.crossTenantReferences.push({ type: 'firebase_uid', table, field, value, row_legacy_id: asString(row.legacy_id), row_church_legacy_id: churchId, user_church_legacy_id: userChurch });
+                report.crossTenantReferences.push({
+                  type: 'firebase_uid',
+                  table,
+                  field,
+                  value,
+                  row_legacy_id: asString(row.legacy_id),
+                  row_church_legacy_id: churchId,
+                  user_church_legacy_id: userChurch,
+                });
               }
             }
           }
@@ -137,12 +155,26 @@ function main() {
               const userChurch = asString(user.church_legacy_id);
               if (churchId && userChurch && churchId !== userChurch) {
                 report.summary.crossTenantIdentityRefs += 1;
-                report.crossTenantReferences.push({ type: 'legacy_user_ref', table, field, value, row_legacy_id: asString(row.legacy_id), row_church_legacy_id: churchId, user_church_legacy_id: userChurch });
+                report.crossTenantReferences.push({
+                  type: 'legacy_user_ref',
+                  table,
+                  field,
+                  value,
+                  row_legacy_id: asString(row.legacy_id),
+                  row_church_legacy_id: churchId,
+                  user_church_legacy_id: userChurch,
+                });
               }
             }
           } else {
             report.summary.unresolvedLegacyUserRefs += 1;
-            report.legacyUserReferences.push({ table, field, value, church_legacy_id: churchId, row_legacy_id: asString(row.legacy_id) });
+            report.legacyUserReferences.push({
+              table,
+              field,
+              value,
+              church_legacy_id: churchId,
+              row_legacy_id: asString(row.legacy_id),
+            });
           }
         }
 
@@ -153,13 +185,31 @@ function main() {
             field.startsWith('event_') ? 'events' :
             field.startsWith('volunteer_') ? 'volunteers' :
             field.startsWith('kategori_') ? 'finance_categories' : null;
+
           if (targetTable && churchId) {
             const owners = tableTenant.get(`${targetTable}:${value}`) || [];
             if (!owners.length) {
-              report.notes.push({ type: 'unresolved_entity_ref', table, field, value, church_legacy_id: churchId, target_table: targetTable, row_legacy_id: asString(row.legacy_id) });
+              report.notes.push({
+                type: 'unresolved_entity_ref',
+                table,
+                field,
+                value,
+                church_legacy_id: churchId,
+                target_table: targetTable,
+                row_legacy_id: asString(row.legacy_id),
+              });
             } else if (!owners.includes(churchId)) {
               report.summary.crossTenantIdentityRefs += 1;
-              report.crossTenantReferences.push({ type: 'entity_ref', table, field, value, row_legacy_id: asString(row.legacy_id), row_church_legacy_id: churchId, target_table: targetTable, target_church_legacy_ids: owners });
+              report.crossTenantReferences.push({
+                type: 'entity_ref',
+                table,
+                field,
+                value,
+                row_legacy_id: asString(row.legacy_id),
+                row_church_legacy_id: churchId,
+                target_table: targetTable,
+                target_church_legacy_ids: owners,
+              });
             }
           }
         }
@@ -167,17 +217,21 @@ function main() {
     }
   }
 
-  for (const [table, rows] of Object.entries(dataset)) inspectRows(table, rows);
+  for (const [table, rows] of Object.entries(collections)) inspectRows(table, rows);
 
-  // These are intentionally legacy references and need explicit resolution during import.
-  const identityResolution = [
-    'announcements.author_legacy_ref',
-    'income_transactions.approved_by_legacy_ref',
-    'expense_transactions.approved_by_legacy_ref',
-    'approval_history.by_legacy_ref',
-  ];
-  report.notes.push({ type: 'manual_resolution_required', fields: identityResolution });
-  report.notes.push({ type: 'firebase_uid_map_required', reason: 'Every legacy Firebase Auth UID must map to a real Supabase auth.users.id before profiles/messages/notifications are imported.' });
+  report.notes.push({
+    type: 'manual_resolution_required',
+    fields: [
+      'announcements.author_legacy_ref',
+      'income_transactions.approved_by_legacy_ref',
+      'expense_transactions.approved_by_legacy_ref',
+      'approval_history.by_legacy_ref',
+    ],
+  });
+  report.notes.push({
+    type: 'firebase_uid_map_required',
+    reason: 'Every legacy Firebase Auth UID must map to a real Supabase auth.users.id before profiles/messages/notifications are imported.',
+  });
 
   const outputPath = args.output || path.resolve('.migration-identity-audit.json');
   fs.writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
