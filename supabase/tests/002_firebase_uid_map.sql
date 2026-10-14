@@ -40,17 +40,26 @@ select throws_ok(
   'authenticated cannot insert firebase UID mappings'
 );
 select is(
-  (select count(*) from public.firebase_uid_map where legacy_uid='blocked-update'),
+  (with changed as (
+    update public.firebase_uid_map
+    set legacy_uid='blocked-update'
+    where legacy_uid='firebase-test-legacy-uid'
+    returning *
+  ) select count(*) from changed),
   0::bigint,
   'authenticated cannot update firebase UID mappings'
 );
 select is(
-  (select count(*) from public.firebase_uid_map where legacy_uid='firebase-test-legacy-uid'),
+  (with removed as (
+    delete from public.firebase_uid_map
+    where legacy_uid='firebase-test-legacy-uid'
+    returning *
+  ) select count(*) from removed),
   0::bigint,
   'authenticated cannot delete firebase UID mappings'
 );
 
--- Anonymous clients must not be able to read the mapping table either.
+-- Anonymous clients must not be able to read or insert mapping rows either.
 reset role;
 set role anon;
 select set_config('request.jwt.claims','{}',true);
@@ -58,6 +67,11 @@ select is(
   (select count(*) from public.firebase_uid_map),
   0::bigint,
   'anonymous cannot read firebase UID mappings'
+);
+select throws_ok(
+  $$insert into public.firebase_uid_map (legacy_uid,auth_user_id) values ('anon-blocked-insert','00000000-0000-0000-0000-000000000099')$$,
+  '42501', null,
+  'anonymous cannot insert firebase UID mappings'
 );
 
 reset role;
