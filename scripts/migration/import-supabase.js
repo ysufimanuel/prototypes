@@ -59,11 +59,19 @@ function buildMapping(mappingSource) {
   return map;
 }
 
-function resolveLegacyUser(value, churchId, mapping) {
+function resolveLegacyUser(value, churchId, mapping, knownUids) {
   const ref = asString(value);
   if (!ref) return null;
+
+  // Some Firebase fields already contain the Firebase Auth UID directly.
+  // Do not force those through the legacy numeric/reference mapping.
+  if (knownUids.has(ref)) return ref;
+
   const uid = mapping.get(`${asString(churchId)}:${ref}`);
   if (!uid) throw new Error(`Unresolved legacy user ref ${ref} for church ${churchId}.`);
+  if (!knownUids.has(uid)) {
+    throw new Error(`Legacy user mapping resolves ${ref} for church ${churchId} to unknown Firebase UID ${uid}.`);
+  }
   return uid;
 }
 
@@ -117,7 +125,7 @@ function makePlan(dataset, mappingSource) {
         legacy_id: asString(row.legacy_id),
         church_legacy_id: asString(row.church_legacy_id),
         source_ref: asString(row[field]),
-        firebase_uid: resolveLegacyUser(row[field], row.church_legacy_id, mapping),
+        firebase_uid: resolveLegacyUser(row[field], row.church_legacy_id, mapping, knownUids),
       });
     }
   }
@@ -137,7 +145,7 @@ function makePlan(dataset, mappingSource) {
     assumptions: [
       'Supabase auth.users records are not created by this dry-run script.',
       'Firebase UID to Supabase auth UUID mapping must be supplied before live profile/message/notification import.',
-      'Legacy numeric user refs are resolved only through the explicit tenant-scoped mapping file.',
+      'Legacy numeric user refs are resolved through the tenant-scoped mapping file; fields already containing a known Firebase UID are accepted directly.',
     ],
   };
 }
