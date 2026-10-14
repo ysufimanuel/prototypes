@@ -39,9 +39,15 @@ function rows(collections, name) {
   return Array.isArray(collections?.[name]) ? collections[name] : [];
 }
 
-function buildMapping(mappingRows) {
+function buildMapping(mappingSource) {
+  const mappingRows = Array.isArray(mappingSource)
+    ? mappingSource
+    : Array.isArray(mappingSource?.mappings)
+      ? mappingSource.mappings
+      : [];
+
   const map = new Map();
-  for (const row of Array.isArray(mappingRows) ? mappingRows : []) {
+  for (const row of mappingRows) {
     const church = asString(row?.church_legacy_id);
     const legacy = asString(row?.legacy_user_ref);
     const uid = asString(row?.firebase_uid);
@@ -61,13 +67,13 @@ function resolveLegacyUser(value, churchId, mapping) {
   return uid;
 }
 
-function makePlan(dataset, mappingRows) {
+function makePlan(dataset, mappingSource) {
   const collections = dataset?.collections;
   if (!collections || typeof collections !== 'object' || Array.isArray(collections)) {
     throw new Error('Migration dataset is missing collections.');
   }
 
-  const mapping = buildMapping(mappingRows);
+  const mapping = buildMapping(mappingSource);
   const users = rows(collections, 'users');
   const knownUids = new Set(users.map((row) => asString(row?.legacy_uid)).filter(Boolean));
 
