@@ -54,10 +54,6 @@ const TENANT_ID_TABLES = new Set([
   'notifications', 'deaths', 'website_pages', 'public_site_pages', 'public_site_events',
 ]);
 
-// Only tables whose database schema enforces a composite primary/unique relationship
-// belong here. Event participation and attendance are intentionally excluded because
-// multiple rows for the same event/member pair can represent distinct registrations
-// or attendance dates/records.
 const JUNCTION_KEYS = {
   family_members: ['church_legacy_id', 'family_legacy_id', 'member_legacy_id'],
   group_members: ['church_legacy_id', 'group_legacy_id', 'member_legacy_id'],
@@ -65,7 +61,6 @@ const JUNCTION_KEYS = {
 };
 
 function countRows(sourceCollections, planTables, name) {
-  // profiles are generated from the root users collection in the transform stage.
   const sourceName = name === 'profiles' ? 'users' : name;
   const source = rows(sourceCollections, sourceName).length;
   const planned = Array.isArray(planTables?.[name]) ? planTables[name].length : 0;
@@ -75,9 +70,7 @@ function countRows(sourceCollections, planTables, name) {
 function assertCountParity(sourceCollections, planTables, errors) {
   for (const table of TABLES) {
     const { source, planned } = countRows(sourceCollections, planTables, table);
-    if (source !== planned) {
-      errors.push(`${table}: source=${source}, plan=${planned}`);
-    }
+    if (source !== planned) errors.push(`${table}: source=${source}, plan=${planned}`);
   }
 }
 
@@ -140,9 +133,53 @@ function assertUserResolution(plan, errors) {
   if (unresolved.length) errors.push(`unresolved user references: ${unresolved.length}`);
 }
 
+function isAuthResolvedPlan(plan) {
+  return plan?.version === 3 && plan?.mode === 'auth-resolved-dry-run';
+}
+
+function assertAuthResolution(plan, errors) {
+  if (!isAuthResolvedPlan(plan)) return;
+
+  const authMapping = plan.authMapping;
+  if (!authMapping || authMapping.liveSupabaseWrite !== false) {
+    errors.push('authMapping.liveSupabaseWrite must be false');
+  }
+
+  const profiles = Array.isArray(plan.tables?.profiles) ? plan.tables.profiles : [];
+  const refs = Array.isArray(plan.resolvedLegacyUserRefs) ? plan.resolvedLegacyUserRefs : [];
+  const profileMissing = profiles.filter((row) => !asString(row.auth_user_id));
+  const refMissing = refs.filter((row) => !asString(row.auth_user_id));
+
+  if (profileMissing.length) errors.push(`profiles missing auth_user_id: ${profileMissing.length}`);
+  if (refMissing.length) errors.push(`resolved user refs missing auth_user_id: ${refMissing.length}`);
+
+  if (authMapping.firebaseUidsExpected !== profiles.length) {
+    errors.push(`auth mapping expected Firebase UIDs=${authMapping.firebaseUidsExpected}, profiles=${profiles.length}`);
+  }
+  if (authMapping.firebaseUidsMapped !== authMapping.firebaseUidsExpected) {
+    errors.push(`auth mapping incomplete: mapped=${authMapping.firebaseUidsMapped}, expected=${authMapping.firebaseUidsExpected}`);
+  }
+  if (authMapping.profilesResolved !== profiles.length) {
+    errors.push(`auth mapping profilesResolved=${authMapping.profilesResolved}, profiles=${profiles.length}`);
+  }
+  if (authMapping.userRefsResolved !== refs.length) {
+    errors.push(`auth mapping userRefsResolved=${authMapping.userRefsResolved}, refs=${refs.length}`);
+  }
+
+  if (plan.validation.firebaseToSupabaseAuthMappingChecked !== true) {
+    errors.push('plan validation.firebaseToSupabaseAuthMappingChecked is not true');
+  }
+  if (plan.validation.profilesHaveAuthUserId !== true) {
+    errors.push('plan validation.profilesHaveAuthUserId is not true');
+  }
+  if (plan.validation.resolvedUserRefsHaveAuthUserId !== true) {
+    errors.push('plan validation.resolvedUserRefsHaveAuthUserId is not true');
+  }
+}
+
 function assertPlanShape(plan, errors) {
-  if (!plan || plan.version !== 2) errors.push(`unexpected plan version: ${plan?.version}`);
-  if (plan?.mode !== 'dry-run') errors.push(`unexpected plan mode: ${plan?.mode}`);
+  const supported = (plan?.version === 2 && plan?.mode === 'dry-run') || isAuthResolvedPlan(plan);
+  if (!supported) errors.push(`unexpected plan version/mode: ${plan?.version}/${plan?.mode}`);
   if (!plan?.tables || typeof plan.tables !== 'object') errors.push('plan.tables is missing');
   if (!plan?.counts || typeof plan.counts !== 'object') errors.push('plan.counts is missing');
 }
@@ -169,6 +206,7 @@ function main() {
     assertNoDuplicateJunctions(plan.tables, errors);
     assertTenantConsistency(plan.tables, errors);
     assertUserResolution(plan, errors);
+    assertAuthResolution(plan, errors);
   }
 
   if (plan?.counts?.donors === 0) warnings.push('donors is empty; this matches the audited source backup.');
