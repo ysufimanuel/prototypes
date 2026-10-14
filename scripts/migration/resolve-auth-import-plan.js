@@ -6,14 +6,21 @@ const path = require('node:path');
 
 const DEFAULT_PLAN = path.resolve('.migration-import-plan.json');
 const DEFAULT_AUTH_MAPPING = path.resolve('.auth-mapping-dry-run.json');
+const DEFAULT_LEGACY_USER_MAP = path.resolve('scripts/migration/legacy-user-map.json');
 const DEFAULT_OUTPUT = path.resolve('.migration-import-plan-auth-resolved.json');
 
 function parseArgs(argv) {
-  const args = { plan: DEFAULT_PLAN, authMapping: DEFAULT_AUTH_MAPPING, output: DEFAULT_OUTPUT };
+  const args = {
+    plan: DEFAULT_PLAN,
+    authMapping: DEFAULT_AUTH_MAPPING,
+    legacyUserMap: DEFAULT_LEGACY_USER_MAP,
+    output: DEFAULT_OUTPUT,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === '--plan') args.plan = path.resolve(argv[++i]);
     else if (value === '--auth-mapping') args.authMapping = path.resolve(argv[++i]);
+    else if (value === '--legacy-user-map') args.legacyUserMap = path.resolve(argv[++i]);
     else if (value === '--output') args.output = path.resolve(argv[++i]);
     else if (value === '--help' || value === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${value}`);
@@ -22,7 +29,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`Usage: node scripts/migration/resolve-auth-import-plan.js [options]\n\nOptions:\n  --plan <file>          Existing migration import plan (default: .migration-import-plan.json)\n  --auth-mapping <file>  Firebase UID -> Supabase Auth UUID mapping (default: .auth-mapping-dry-run.json)\n  --output <file>        Write resolved plan (default: .migration-import-plan-auth-resolved.json)`);
+  console.log(`Usage: node scripts/migration/resolve-auth-import-plan.js [options]\n\nOptions:\n  --plan <file>              Existing migration import plan (default: .migration-import-plan.json)\n  --auth-mapping <file>      Firebase UID -> Supabase Auth UUID mapping (default: .auth-mapping-dry-run.json)\n  --legacy-user-map <file>   Legacy user ref -> Firebase UID mapping (default: scripts/migration/legacy-user-map.json)\n  --output <file>            Write resolved plan (default: .migration-import-plan-auth-resolved.json)`);
 }
 
 function readJson(file) {
@@ -52,15 +59,58 @@ function buildAuthMapping(source) {
   return map;
 }
 
-function resolveUid(firebaseUid, authMap, sourceLabel) {
-  const uid = asString(firebaseUid);
-  if (!uid) return null;
-  const authUserId = authMap.get(uid);
-  if (!authUserId) throw new Error(`${sourceLabel} references Firebase UID ${uid}, but no Supabase Auth UUID mapping exists.`);
-  return authUserId;
+function buildLegacyUserMapping(source) {
+  const rows = Array.isArray(source) ? source : source?.mappings;
+  if (!Array.isArray(rows)) throw new Error('Legacy user mapping is invalid. Expected a mappings array.');
+
+  const map = new Map();
+  for (const row of rows) {
+    const churchLegacyId = asString(row?.church_legacy_id);
+    const legacyUserRef = asString(row?.legacy_user_ref);
+    const firebaseUid = asString(row?.firebase_uid);
+    if (!churchLegacyId || !legacyUserRef || !firebaseUid) {
+      throw new Error('Invalid legacy user mapping row. Each row requires church_legacy_id, legacy_user_ref and firebase_uid.');
+    }
+    const key = `${churchLegacyId}:${legacyUserRef}`;
+    if (map.has(key) && map.get(key) !== firebaseUid) throw new Error(`Conflicting legacy user mapping for ${key}.`);
+    map.set(key, firebaseUid);
+  }
+  return map;
 }
 
-function materializeUserFields(plan, authMap) {
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function resolveUid(value, churchLegacyId, authMap, legacyUserMap, sourceLabel) {
+  const ref = asString(value);
+  if (!ref) return null;
+
+  // The resolver can be run repeatedly. If a previous run already materialized
+  // a Supabase Auth UUID, keep it instead of treating the UUID as a Firebase UID.
+  if (isUuid(ref) && [...authMap.values()].includes(ref)) return { firebaseUid: null, authUserId: ref };
+
+  // Most references are already Firebase UIDs.
+  const directAuthUserId = authMap.get(ref);
+  if (directAuthUserId) return { firebaseUid: ref, authUserId: directAuthUserId };
+
+  // Some legacy Firestore fields contain a church-local user ref such as "1".
+  // Resolve that legacy ref to its Firebase UID first, scoped by church.
+  const legacyKey = `${asString(churchLegacyId)}:${ref}`;
+  const firebaseUid = legacyUserMap.get(legacyKey);
+  if (!firebaseUid) {
+    throw new Error(`${sourceLabel} references user ref ${ref} for church ${churchLegacyId}, but neither a Firebase UID nor a scoped legacy-user mapping exists.`);
+  }
+
+  const authUserId = authMap.get(firebaseUid);
+  if (!authUserId) {
+    throw new Error(`${sourceLabel} legacy user ref ${ref} for church ${churchLegacyId} resolves to Firebase UID ${firebaseUid}, but no Supabase Auth UUID mapping exists.`);
+  }
+
+  return { firebaseUid, authUserId };
+}
+
+function materializeUserFields(plan, authMap, legacyUserMap) {
   const tables = { ...plan.tables };
   const resolvedRefs = [];
   const unresolved = [];
@@ -90,9 +140,23 @@ function materializeUserFields(plan, authMap) {
           continue;
         }
         try {
-          const authUserId = resolveUid(next[sourceField], authMap, `${table}/${next.legacy_id ?? next.church_legacy_id ?? 'row'}/${sourceField}`);
-          next[targetField] = authUserId;
-          resolvedRefs.push({ table, legacy_id: asString(next.legacy_id), church_legacy_id: asString(next.church_legacy_id), source_field: sourceField, source_ref: asString(next[sourceField]), firebase_uid: asString(next[sourceField]), auth_user_id: authUserId });
+          const resolved = resolveUid(
+            next[sourceField],
+            next.church_legacy_id,
+            authMap,
+            legacyUserMap,
+            `${table}/${next.legacy_id ?? next.church_legacy_id ?? 'row'}/${sourceField}`,
+          );
+          next[targetField] = resolved.authUserId;
+          resolvedRefs.push({
+            table,
+            legacy_id: asString(next.legacy_id),
+            church_legacy_id: asString(next.church_legacy_id),
+            source_field: sourceField,
+            source_ref: asString(next[sourceField]),
+            firebase_uid: resolved.firebaseUid,
+            auth_user_id: resolved.authUserId,
+          });
         } catch (error) {
           unresolved.push(error.message);
         }
@@ -110,15 +174,31 @@ function main() {
 
   const plan = readJson(args.plan);
   const authMap = buildAuthMapping(readJson(args.authMapping));
+  const legacyUserMap = buildLegacyUserMapping(readJson(args.legacyUserMap));
   const profiles = Array.isArray(plan.tables?.profiles) ? plan.tables.profiles : [];
 
-  const resolvedProfiles = profiles.map((profile) => ({
-    ...profile,
-    auth_user_id: resolveUid(profile.auth_user_legacy_uid || profile.legacy_uid, authMap, `Profile ${profile.legacy_uid}`),
-  }));
+  const resolvedProfiles = profiles.map((profile) => {
+    const resolved = resolveUid(
+      profile.auth_user_legacy_uid || profile.legacy_uid,
+      profile.church_legacy_id,
+      authMap,
+      legacyUserMap,
+      `Profile ${profile.legacy_uid}`,
+    );
+    return {
+      ...profile,
+      auth_user_id: resolved.authUserId,
+    };
+  });
 
-  const materialized = materializeUserFields({ ...plan, tables: { ...plan.tables, profiles: resolvedProfiles } }, authMap);
-  if (materialized.unresolved.length) throw new Error(`${materialized.unresolved.length} user references could not be mapped to Supabase Auth UUIDs. First: ${materialized.unresolved[0]}`);
+  const materialized = materializeUserFields(
+    { ...plan, tables: { ...plan.tables, profiles: resolvedProfiles } },
+    authMap,
+    legacyUserMap,
+  );
+  if (materialized.unresolved.length) {
+    throw new Error(`${materialized.unresolved.length} user references could not be mapped to Supabase Auth UUIDs. First: ${materialized.unresolved[0]}`);
+  }
 
   const output = {
     ...plan,
@@ -129,6 +209,7 @@ function main() {
     authMapping: {
       firebaseUidsExpected: profiles.length,
       firebaseUidsMapped: authMap.size,
+      legacyUserRefsMapped: legacyUserMap.size,
       profilesResolved: resolvedProfiles.length,
       userRefsResolved: materialized.resolvedRefs.length,
       liveSupabaseWrite: false,
@@ -136,6 +217,7 @@ function main() {
     validation: {
       ...(plan.validation || {}),
       firebaseToSupabaseAuthMappingChecked: true,
+      legacyUserRefMappingChecked: true,
       profilesHaveAuthUserId: resolvedProfiles.every((row) => Boolean(row.auth_user_id)),
       resolvedUserRefsHaveAuthUserId: materialized.resolvedRefs.every((row) => Boolean(row.auth_user_id)),
       liveSupabaseWrite: false,
@@ -146,6 +228,7 @@ function main() {
 
   console.log('Supabase Auth UUID resolution: PASS');
   console.log(`Firebase UIDs mapped: ${authMap.size}`);
+  console.log(`Legacy user refs mapped: ${legacyUserMap.size}`);
   console.log(`Profiles resolved: ${resolvedProfiles.length}`);
   console.log(`Resolved legacy user refs: ${materialized.resolvedRefs.length}`);
   console.log(`Resolved plan: ${args.output}`);
