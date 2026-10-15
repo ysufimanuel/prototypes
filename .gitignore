@@ -18,3 +18,23 @@ Thumbs.db
 # Local migration artifacts / exported data
 supabase/.migration-data.json
 supabase/.migration-data.*.json
+.migration-data.json
+.migration-data-v4.json
+.migration-identity-audit.json
+.migration-validation.json
+.auth-mapping-dry-run.json
+.auth-migration-dry-run.json
+.auth-migration-plan.json
+.migration-import-plan.json
+.migration-import-plan-auth-resolved.json
+backup.json
+backup-v2.json
+scripts/migration/.migration-data-v4.json
+supabase/.branches/
+supabase/.temp/
+supabase/.migration-data.*.json
+
+# Local migration backup artifacts
+*.backup.json
+scripts/migration/*.backup*.js
+scripts/migration/*.before-*.js
