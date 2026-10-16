@@ -145,8 +145,12 @@ function getRoutePath(req) {
   if (typeof queryPath === "string" && queryPath) return queryPath.replace(/^\/+|\/+$/g, "");
 
   const rawUrl = String(req.url || "").split("?", 1)[0];
-  const prefix = "/api/admin/website-supabase/";
-  if (!rawUrl.startsWith(prefix)) return "";
+  const prefixes = [
+    "/api/admin/website-supabase/",
+    "/api/admin/website/",
+  ];
+  const prefix = prefixes.find((candidate) => rawUrl.startsWith(candidate));
+  if (!prefix) return "";
   return decodeURIComponent(rawUrl.slice(prefix.length)).replace(/^\/+|\/+$/g, "");
 }
 
