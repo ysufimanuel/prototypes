@@ -1,5 +1,4 @@
-﻿import 'dotenv/config';
-import { supabaseAdmin } from '../api/_lib/supabase.js';
+﻿import { supabaseAdmin } from '../api/_lib/supabase.js';
 
 const { data, error } = await supabaseAdmin
   .from('churches')
