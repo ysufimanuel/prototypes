@@ -142,7 +142,12 @@ async function loadSupabaseDraft(user) {
 function getRoutePath(req) {
   const queryPath = req.query?.path;
   if (Array.isArray(queryPath)) return queryPath.join("/");
-  return String(queryPath || "").replace(/^\/+|\/+$/g, "");
+  if (typeof queryPath === "string" && queryPath) return queryPath.replace(/^\/+|\/+$/g, "");
+
+  const rawUrl = String(req.url || "").split("?", 1)[0];
+  const prefix = "/api/admin/website-supabase/";
+  if (!rawUrl.startsWith(prefix)) return "";
+  return decodeURIComponent(rawUrl.slice(prefix.length)).replace(/^\/+|\/+$/g, "");
 }
 
 module.exports = async function handler(req, res) {
