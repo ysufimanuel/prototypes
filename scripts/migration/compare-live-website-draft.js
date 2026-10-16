@@ -1,19 +1,37 @@
-const { db } = require("../../api/_lib/firebase-admin");
+const fs = require("fs");
+const path = require("path");
+const { initializeApp, cert, getApps } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const { supabaseAdmin } = require("../../api/_lib/supabase");
 
+function getLocalFirebaseDb() {
+  if (getApps().length > 0) return getFirestore(getApps()[0]);
+
+  const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!credentialsPath) {
+    throw new Error("GOOGLE_APPLICATION_CREDENTIALS belum dikonfigurasi untuk comparator lokal.");
+  }
+
+  const resolvedPath = path.resolve(process.cwd(), credentialsPath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(`Firebase service account tidak ditemukan: ${resolvedPath}`);
+  }
+
+  const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+  const app = initializeApp({ credential: cert(serviceAccount) });
+  return getFirestore(app);
+}
+
 function canonicalize(value) {
-  if (value === undefined) return null;
-  if (value === null) return null;
+  if (value === undefined || value === null) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value?.toDate === "function") return value.toDate().toISOString();
   if (Array.isArray(value)) return value.map(canonicalize);
   if (typeof value === "object") {
-    return Object.keys(value)
-      .sort()
-      .reduce((out, key) => {
-        out[key] = canonicalize(value[key]);
-        return out;
-      }, {});
+    return Object.keys(value).sort().reduce((out, key) => {
+      out[key] = canonicalize(value[key]);
+      return out;
+    }, {});
   }
   return value;
 }
@@ -54,15 +72,13 @@ function normalizeNavigation(value) {
 }
 
 function normalizePages(pages) {
-  return (pages || [])
-    .map((page) => ({
-      id: String(page.id),
-      title: page.title || "",
-      slug: page.slug || "",
-      published: page.published === true,
-      sections: Array.isArray(page.sections) ? page.sections : [],
-    }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  return (pages || []).map((page) => ({
+    id: String(page.id),
+    title: page.title || "",
+    slug: page.slug || "",
+    published: page.published === true,
+    sections: Array.isArray(page.sections) ? page.sections : [],
+  })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function diff(label, firebaseValue, supabaseValue, differences) {
@@ -140,6 +156,7 @@ async function loadSupabaseDraft(legacyChurchId) {
 }
 
 (async () => {
+  const db = getLocalFirebaseDb();
   const snapshot = await db.collection("churches").get();
   const summary = [];
   let totalErrors = 0;
@@ -154,15 +171,14 @@ async function loadSupabaseDraft(legacyChurchId) {
     diff("navigation", normalizeNavigation(firebase.navigation), normalizeNavigation(supabase.navigation), differences);
     diff("pages", normalizePages(firebase.pages), normalizePages(supabase.pages), differences);
 
-    const result = {
+    summary.push({
       firebaseChurchId: firebase.churchId,
       churchName: firebase.churchName,
       firebasePageCount: firebase.pages.length,
       supabasePageCount: supabase.pages.length,
       differenceCount: differences.length,
       differences,
-    };
-    summary.push(result);
+    });
     totalErrors += differences.length;
   }
 
