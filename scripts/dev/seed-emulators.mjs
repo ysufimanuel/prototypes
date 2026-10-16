@@ -16,6 +16,7 @@ const email = process.env.DEV_FIREBASE_EMAIL || "local-admin@gms-cms.test";
 const password = process.env.DEV_FIREBASE_PASSWORD;
 const churchId = process.env.DEV_CHURCH_ID || "JhSB69TxbhTLKLUlR9VR";
 const role = process.env.DEV_FIREBASE_ROLE || "superadmin";
+const churchName = process.env.DEV_CHURCH_NAME || "GMS";
 
 if (!password) {
   throw new Error("DEV_FIREBASE_PASSWORD wajib diisi saat menjalankan seed.");
@@ -90,6 +91,17 @@ async function ensureFirestoreProfile(userRecord) {
   return profile;
 }
 
+async function ensureFirestoreChurch() {
+  const church = {
+    nama: churchName,
+    name: churchName,
+    seededForLocalDevelopment: true,
+  };
+
+  await db.collection("churches").doc(churchId).set(church, { merge: true });
+  return church;
+}
+
 async function main() {
   console.log("[SEED] Auth emulator:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
   console.log("[SEED] Firestore emulator:", process.env.FIRESTORE_EMULATOR_HOST);
@@ -97,13 +109,15 @@ async function main() {
 
   const authResult = await ensureAuthUser();
   const profile = await ensureFirestoreProfile(authResult.user);
+  await ensureFirestoreChurch();
 
   console.log("[SEED] Auth user:", authResult.action);
   console.log("[SEED] uid:", profile.uid);
   console.log("[SEED] email:", profile.email);
   console.log("[SEED] role:", profile.role);
   console.log("[SEED] churchId:", profile.churchId);
-  console.log("[SEED] PASS — deterministic local admin is ready.");
+  console.log("[SEED] Firestore church:", churchName);
+  console.log("[SEED] PASS — deterministic local admin + church are ready.");
 }
 
 main().catch((error) => {
