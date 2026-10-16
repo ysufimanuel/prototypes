@@ -32,11 +32,6 @@ function objectEntries(value) {
   return Object.entries(value);
 }
 
-function getNestedCollection(parent, name) {
-  if (!parent || typeof parent !== 'object') return {};
-  return parent._subCollections?.[name] || parent[name]?._subCollections || parent[name] || {};
-}
-
 function getWebsiteContentPages(church) {
   const website = church?._subCollections?.website || {};
   const contentWrapped = website.content;
@@ -57,15 +52,9 @@ function normalizeString(value, fallback = '') {
   return String(value);
 }
 
-function normalizeSections(value) {
-  if (Array.isArray(value)) return value;
-  if (value == null) return [];
-  throw new Error('sections must be an array when present');
-}
-
 function isUrl(value) {
   if (typeof value !== 'string') return false;
-  return /^(https?:)?\\/\\//i.test(value.trim()) || /^(data:|blob:)/i.test(value.trim());
+  return /^(https?:)?\/\//i.test(value.trim()) || /^(data:|blob:)/i.test(value.trim());
 }
 
 function isMediaKey(key) {
@@ -84,8 +73,8 @@ function inspectMedia(value, state, key = '') {
 
   if (isUrl(value) && isMediaKey(key)) state.urls += 1;
   for (const [childKey, child] of Object.entries(value)) {
-    if (child && typeof child === 'object' && !Array.isArray(child)) {
-      if (isMediaKey(childKey)) state.objects += 1;
+    if (child && typeof child === 'object' && !Array.isArray(child) && isMediaKey(childKey)) {
+      state.objects += 1;
     }
     inspectMedia(child, state, childKey);
   }
@@ -105,10 +94,8 @@ function validatePage(churchLegacyId, pageId, raw) {
   const media = { urls: 0, objects: 0 };
   if (Array.isArray(sections)) inspectMedia(sections, media);
 
-  let serializedSections = null;
   try {
-    serializedSections = JSON.stringify(sections);
-    JSON.parse(serializedSections);
+    JSON.stringify(sections);
   } catch (error) {
     errors.push(`sections is not JSON serializable: ${error.message}`);
   }
@@ -129,15 +116,12 @@ function validatePage(churchLegacyId, pageId, raw) {
 
 function extractPages(backup, selectedChurch = null) {
   const pages = [];
-  const churches = backup.churches || {};
-
-  for (const [churchLegacyId, church] of Object.entries(churches)) {
+  for (const [churchLegacyId, church] of Object.entries(backup.churches || {})) {
     if (selectedChurch && churchLegacyId !== selectedChurch) continue;
     for (const { id, value } of getWebsiteContentPages(church)) {
       pages.push(validatePage(churchLegacyId, id, value));
     }
   }
-
   return pages;
 }
 
@@ -227,7 +211,6 @@ function assertReady(report) {
 
 async function importPages(report) {
   assertReady(report);
-
   const rows = report.pages.map((page) => ({
     website_id: page.website_id,
     legacy_id: page.legacy_id,
@@ -283,11 +266,7 @@ async function verifyImport(report) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.input) {
-    console.log('Usage:');
-    console.log('  node scripts/migration/migrate-website-pages.js --input <firebase-backup.json>');
-    console.log('  node --env-file=.env scripts/migration/migrate-website-pages.js --input <firebase-backup.json> --execute');
-    console.log('');
-    console.log('Default mode is READ-ONLY preview. --execute is required to write website_pages.');
+    console.log('Usage: node --env-file=.env scripts/migration/migrate-website-pages.js --input /path/to/backup.json [--report report.json] [--church legacyId] [--execute]');
     process.exit(args.help ? 0 : 1);
   }
 
@@ -297,45 +276,26 @@ async function main() {
   const report = buildReport(sourcePath, pages, refs);
 
   if (args.report) {
-    fs.writeFileSync(args.report, JSON.stringify(report, null, 2) + '\n', 'utf8');
+    fs.writeFileSync(args.report, JSON.stringify(report, null, 2), 'utf8');
   }
 
-  console.log(JSON.stringify({
-    mode: args.execute ? 'EXECUTE' : 'PREVIEW',
-    summary: report.summary,
-    pages: report.pages.map((page) => ({
-      church_legacy_id: page.church_legacy_id,
-      supabase_church_id: page.supabase_church_id,
-      website_id: page.website_id,
-      legacy_id: page.legacy_id,
-      title: page.title,
-      slug: page.slug,
-      published: page.published,
-      section_count: page.section_count,
-      media_url_count: page.media_url_count,
-      media_object_count: page.media_object_count,
-      errors: page.errors,
-    })),
-  }, null, 2));
+  console.log(JSON.stringify(report.summary, null, 2));
 
   if (!args.execute) {
-    console.log('[website-pages] PREVIEW ONLY: Supabase was not modified.');
+    console.log('\n[PREVIEW ONLY] No Supabase data was changed.');
     return;
   }
 
-  assertReady(report);
   await importPages(report);
   const verification = await verifyImport(report);
-  console.log(JSON.stringify({ verification }, null, 2));
+  console.log(JSON.stringify({ import: 'completed', verification }, null, 2));
 
   if (!verification.count_match || !verification.sections_match || !verification.metadata_match) {
-    throw new Error('Post-import verification failed. Review the verification output before proceeding.');
+    process.exitCode = 2;
   }
-
-  console.log('[website-pages] IMPORT COMPLETE: page count, sections, and metadata verified.');
 }
 
 main().catch((error) => {
-  console.error(`[website-pages] ${error.message}`);
+  console.error(`[migrate-website-pages] ${error.message}`);
   process.exit(1);
 });
