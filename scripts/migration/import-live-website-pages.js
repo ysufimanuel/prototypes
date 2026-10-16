@@ -8,15 +8,17 @@ const { supabaseAdmin } = require('../../api/_lib/supabase');
 const BATCH_SIZE = 50;
 
 function parseArgs(argv) {
-  const args = { input: 'live-website-pages.json', execute: false, report: null };
+  const args = { input: 'live-website-pages.json', execute: false, verifyOnly: false, report: null };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
     if (value === '--input') args.input = argv[++i];
     else if (value === '--execute') args.execute = true;
+    else if (value === '--verify-only') args.verifyOnly = true;
     else if (value === '--report') args.report = path.resolve(argv[++i]);
     else if (value === '--help' || value === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${value}`);
   }
+  if (args.execute && args.verifyOnly) throw new Error('--execute and --verify-only cannot be used together.');
   return args;
 }
 
@@ -28,13 +30,19 @@ function normalize(value) {
   return String(value ?? '').trim();
 }
 
-function stableJson(value) {
-  return JSON.stringify(value);
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.keys(value).sort().reduce((result, key) => {
+      result[key] = canonicalize(value[key]);
+      return result;
+    }, {});
+  }
+  return value;
 }
 
-function countMediaFromExtracted(churches, field) {
-  return (churches || []).reduce((sum, church) =>
-    sum + (church.pages || []).reduce((pageSum, page) => pageSum + Number(page[field] || 0), 0), 0);
+function stableJson(value) {
+  return JSON.stringify(canonicalize(value));
 }
 
 function validateSource(source) {
@@ -135,9 +143,7 @@ function buildPlan(source, refs) {
       const slug = normalize(page.slug || page.id);
       const key = `${website.id}:${slug}`;
       const existing = existingByKey.get(key);
-      if (existing) {
-        warnings.push(`Existing page will be updated: website=${website.id}, slug=${slug}, id=${existing.id}.`);
-      }
+      if (existing) warnings.push(`Existing page found: website=${website.id}, slug=${slug}, id=${existing.id}.`);
 
       rows.push({
         website_id: website.id,
@@ -228,7 +234,7 @@ async function verify(rows) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log('Usage: node --env-file=.env scripts/migration/import-live-website-pages.js [--input live-website-pages.json] [--report report.json] [--execute]');
+    console.log('Usage: node --env-file=.env scripts/migration/import-live-website-pages.js [--input live-website-pages.json] [--verify-only] [--execute] [--report report.json]');
     return;
   }
 
@@ -243,13 +249,13 @@ async function main() {
   if (plan.errors.length) fail(`Import plan validation failed:\n- ${plan.errors.join('\n- ')}`);
 
   const preview = {
-    mode: args.execute ? 'EXECUTE' : 'DRY_RUN',
+    mode: args.verifyOnly ? 'VERIFY_ONLY' : (args.execute ? 'EXECUTE' : 'DRY_RUN'),
     source_generated_at: source.generatedAt || null,
     expected_pages: plan.rows.length,
     expected_sections: sourceCheck.sectionCount,
     expected_media_urls: sourceCheck.mediaUrlCount,
     expected_media_objects: sourceCheck.mediaObjectCount,
-    existing_website_pages_before_import: refs.existingPages.length,
+    existing_website_pages: refs.existingPages.length,
     warnings: plan.warnings,
     rows: plan.rows.map((row) => ({ website_id: row.website_id, legacy_id: row.legacy_id, title: row.title, slug: row.slug, published: row.published })),
   };
@@ -258,6 +264,17 @@ async function main() {
 
   console.log('[import-live-website-pages] SOURCE + PLAN VALIDATION PASS');
   console.log(JSON.stringify(preview, null, 2));
+
+  if (args.verifyOnly) {
+    if (refs.existingPages.length === 0) fail('VERIFY_ONLY found no destination website_pages rows.');
+    const verification = await verify(plan.rows);
+    console.log('\n[VERIFY-ONLY]');
+    console.log(JSON.stringify(verification, null, 2));
+    const pass = verification.page_count_match && verification.sections_match && verification.metadata_match && verification.no_unexpected_pages && verification.no_duplicate_destination_keys && verification.mismatch_count === 0;
+    console.log(`\n[RESULT] ${pass ? 'PASS — website pages match the live extraction 1:1.' : 'FAIL — verification mismatch detected.'}`);
+    if (!pass) process.exitCode = 2;
+    return;
+  }
 
   if (!args.execute) {
     console.log('\n[DRY RUN] No Supabase data was changed.');
