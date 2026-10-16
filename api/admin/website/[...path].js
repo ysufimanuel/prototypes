@@ -225,10 +225,17 @@ module.exports = async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (!["GET", "POST", "PUT", "OPTIONS"].includes(req.method)) return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
 
+  const path = getRoutePath(req);
+
+  // Stage 3B: GET /draft can be switched to the Supabase read adapter without
+  // changing PUT/provision/publish behavior. Default remains Firebase for safety.
+  if (path === "draft" && req.method === "GET" && process.env.WEBSITE_DRAFT_BACKEND === "supabase") {
+    const supabaseDraftHandler = require("../website-supabase/[...path]");
+    return supabaseDraftHandler(req, res);
+  }
+
   const user = await requireChurchAdmin(req, res);
   if (!user) return;
-
-  const path = getRoutePath(req);
 
   try {
     if (path === "draft" && req.method === "GET") return await getDraft(req, res, user);
