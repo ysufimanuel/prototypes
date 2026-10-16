@@ -6,6 +6,7 @@
     "build:css": "npx @tailwindcss/cli -i ./src/tailwind-input.css -o ./css/tailwind.css --minify"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "firebase-admin": "^13.5.0"
   },
   "devDependencies": {
