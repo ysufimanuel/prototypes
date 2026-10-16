@@ -54,6 +54,35 @@ async function loadDraft() {
   }
 }
 
+async function loadFirebaseDraft() {
+  if (!user) throw new Error("AUTH_REQUIRED");
+  const token = await withTimeout(
+    user.getIdToken(),
+    15000,
+    "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.",
+  );
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch("/api/admin/website-firebase/draft", {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success)
+      throw new Error(data.message || "Gagal memuat draft Firebase.");
+    draft = data.data;
+    return draft;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Request draft Firebase terlalu lama (lebih dari 20 detik).");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 async function content() {
   const id = draft?.church?.id;
   if (!id) return { events: [], ministries: [] };
@@ -90,7 +119,13 @@ function ensurePicker() {
 
   select.addEventListener("change", async () => {
     selectedPage = select.value;
-    await refresh({ animate: true, keepPage: true });
+    try {
+      await send();
+      flashPreview();
+    } catch (error) {
+      console.error("[WEBSITE PREVIEW] page switch:", error);
+      alert(error.message || "Preview halaman gagal dimuat.");
+    }
   });
 
   bar.insertBefore(label, $("preview-refresh"));
@@ -192,6 +227,14 @@ async function refresh({ animate = true, keepPage = true } = {}) {
   }
 }
 
+function applyDraft(nextDraft) {
+  if (!nextDraft || !Array.isArray(nextDraft.pages)) return false;
+  draft = JSON.parse(JSON.stringify(nextDraft));
+  ensurePicker();
+  fillPicker();
+  return true;
+}
+
 function init() {
   ensurePicker();
 
@@ -215,8 +258,27 @@ function init() {
     send().catch(console.error);
   });
 
-  window.addEventListener("cms:website-draft-updated", () => {
-    refresh({ animate: true, keepPage: true });
+  window.addEventListener("cms:website-draft-updated", async (event) => {
+    const suppliedDraft = event.detail?.draft;
+    if (applyDraft(suppliedDraft)) {
+      try {
+        await send();
+        flashPreview();
+      } catch (error) {
+        console.error("[WEBSITE PREVIEW] local draft update:", error);
+      }
+      return;
+    }
+
+    try {
+      await loadFirebaseDraft();
+      fillPicker();
+      await send();
+      flashPreview();
+    } catch (error) {
+      console.error("[WEBSITE PREVIEW] Firebase draft refresh:", error);
+      alert(error.message || "Preview gagal diperbarui.");
+    }
   });
 
   const previewFrame = frame();
