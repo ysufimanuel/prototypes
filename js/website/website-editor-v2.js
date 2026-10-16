@@ -5,6 +5,7 @@ let user = null;
 let draft = null;
 let editing = null;
 const API = "/api/admin/website";
+const FIREBASE_DRAFT_API = "/api/admin/website-firebase/draft";
 
 const esc = v => String(v ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 
@@ -55,8 +56,35 @@ async function api(path, options = {}) {
   }
 }
 
-async function loadDraft() { draft = (await api("/draft")).data; return draft; }
-function ensureMobilePublish() { if ($("website-mobile-publish")) return; const b=document.createElement("button"); b.id="website-mobile-publish"; b.className="website-publish-btn mobile-publish-floating"; b.type="button"; b.innerHTML='<i class="fas fa-cloud-upload-alt"></i><span>Publish</span>'; b.addEventListener("click", publish); document.body.appendChild(b); }
+async function loadDraft() {
+  if (!user) throw new Error("AUTH_REQUIRED");
+  const token = await withTimeout(
+    user.getIdToken(),
+    15000,
+    "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.",
+  );
+  const controller = new AbortController();
+  const requestTimeout = window.setTimeout(() => controller.abort(), 20000);
+  try {
+    const r = await fetch(FIREBASE_DRAFT_API, {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.success === false)
+      throw new Error(data.message || `HTTP ${r.status}`);
+    draft = data.data;
+    return draft;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Request draft Firebase terlalu lama (lebih dari 20 detik).");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(requestTimeout);
+  }
+}
+
 async function publish(){try{await saveAll();const a=await api("/publish",{method:"POST",body:"{}"});await api("/publish-events",{method:"POST",body:"{}"});await api("/publish-groups",{method:"POST",body:"{}"});alert(a.message||"Website berhasil dipublikasikan.");window.dispatchEvent(new CustomEvent("cms:website-draft-updated"));}catch(e){console.error(e);alert(e.message||"Gagal mempublikasikan website.")}}
 function mediaRow(m={}) { const id=m.id||`media-${Date.now()}-${Math.random().toString(36).slice(2,7)}`; return `<div class="v2-media-row" data-media-id="${esc(id)}"><div class="form-grid"><label>Jenis Media<select class="v2-media-type"><option value="image" ${m.type==="image"?"selected":""}>Foto / Gambar</option><option value="youtube" ${m.type==="youtube"?"selected":""}>YouTube</option><option value="vimeo" ${m.type==="vimeo"?"selected":""}>Vimeo</option><option value="video" ${m.type==="video"?"selected":""}>Video URL</option></select></label><label>Judul Media<input class="v2-media-title" maxlength="160" value="${esc(m.title||"")}"></label><label class="full">URL Media<input class="v2-media-url" type="url" maxlength="1000" placeholder="https://..." value="${esc(m.url||"")}"></label><label>Posisi<select class="v2-media-position"><option value="top" ${m.position==="top"?"selected":""}>Atas teks</option><option value="bottom" ${!m.position||m.position==="bottom"?"selected":""}>Bawah teks</option><option value="left" ${m.position==="left"?"selected":""}>Kiri teks</option><option value="right" ${m.position==="right"?"selected":""}>Kanan teks</option><option value="background" ${m.position==="background"?"selected":""}>Background / Overlay</option></select></label><label>Mode<select class="v2-media-mode"><option value="inline" ${m.mode!=="background"?"selected":""}>Media biasa</option><option value="background" ${m.mode==="background"?"selected":""}>Background / Overlay</option></select></label><label>Radius <span class="v2-range-value">${Number(m.radius)||16}px</span><input class="v2-media-radius" type="range" min="0" max="60" value="${Number(m.radius)||16}"></label><label class="v2-overlay-field ${m.mode==="background"||m.position==="background"?"":"hidden"}">Overlay <span class="v2-range-value">${Number(m.overlay)||45}%</span><input class="v2-media-overlay" type="range" min="0" max="95" value="${Number(m.overlay)||45}"></label><div class="full v2-media-actions"><button type="button" class="website-btn secondary v2-media-remove"><i class="fas fa-trash"></i> Hapus Media</button></div></div><div class="v2-media-preview"></div></div>`; }
 function sectionCard(s,i){ const c=s.config||{}, media=Array.isArray(c.media)?c.media:[]; return `<article class="v2-section-card" data-id="${esc(s.id)}"><div class="editor-section-top"><div><strong>${i+1}. ${esc(s.type)}</strong><small>Section</small></div><div class="editor-section-actions"><label class="editor-checkbox"><input class="v2-enabled" type="checkbox" ${s.enabled!==false?"checked":""}> Aktif</label><button type="button" class="icon-btn v2-section-remove" title="Hapus"><i class="fas fa-trash"></i></button></div></div><div class="form-grid"><label>Jenis<select class="v2-section-type">${["hero","welcome","serviceSchedule","featuredEvents","about","ministries","sermons","resources","contact","cta"].map(t=>`<option value="${t}" ${s.type===t?"selected":""}>${t}</option>`).join("")}</select></label><label>Judul<input class="v2-section-title" maxlength="160" value="${esc(c.title||"")}"></label><label class="full">Deskripsi<textarea class="v2-section-description" rows="3" maxlength="1000">${esc(c.description||"")}</textarea></label>${["serviceSchedule","featuredEvents","ministries"].includes(s.type)?`<label>Batas Item<input class="v2-limit" type="number" min="1" max="20" value="${Number(c.limit)||4}"></label>`:""}</div><div class="v2-media-box"><div class="v2-media-head"><div><strong>Media Section</strong><small>Foto/video bisa dipasang di semua section.</small></div><button type="button" class="website-btn secondary v2-media-add"><i class="fas fa-image"></i> Tambah Media</button></div><div class="v2-media-list">${media.map(mediaRow).join("")||'<p class="v2-empty-media">Belum ada media.</p>'}</div></div></article>`; }
