@@ -25,14 +25,9 @@ function safeUrl(value) {
 function yt(value) {
   const url = safeUrl(value);
   if (!url) return "";
-  let id =
-    url.hostname === "youtu.be"
-      ? url.pathname.slice(1)
-      : url.searchParams.get("v") || "";
-  if (!id && url.pathname.startsWith("/embed/"))
-    id = url.pathname.split("/")[2] || "";
-  if (!id && url.pathname.startsWith("/shorts/"))
-    id = url.pathname.split("/")[2] || "";
+  let id = url.hostname === "youtu.be" ? url.pathname.slice(1) : url.searchParams.get("v") || "";
+  if (!id && url.pathname.startsWith("/embed/")) id = url.pathname.split("/")[2] || "";
+  if (!id && url.pathname.startsWith("/shorts/")) id = url.pathname.split("/")[2] || "";
   return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : "";
 }
 
@@ -49,6 +44,7 @@ function mapPoint(value) {
     /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
     /[?&](?:q|query)=(-?\d+(?:\.\d+)?)[,%20]+(-?\d+(?:\.\d+)?)/,
     /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+    /\/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:[/?]|$)/,
   ];
   for (const pattern of patterns) {
     const match = raw.match(pattern);
@@ -62,9 +58,7 @@ function mapEmbed(value) {
   if (!url) return "";
   const point = mapPoint(url.href);
   const query = point ? `${point.lat},${point.lng}` : url.href;
-  return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=${
-    point ? 16 : 14
-  }&output=embed`;
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=${point ? 16 : 14}&output=embed`;
 }
 
 function renderMapPreview(input) {
@@ -80,15 +74,21 @@ function renderMapPreview(input) {
   box.dataset.value = value;
 
   if (!value) {
-    box.innerHTML =
-      '<div class="media-preview-empty">Tempel link Google Maps untuk melihat titik lokasi.</div>';
+    box.innerHTML = '<div class="media-preview-empty">Tempel link Google Maps untuk melihat titik lokasi.</div>';
     return;
   }
 
   const src = mapEmbed(value);
-  box.innerHTML = src
-    ? `<iframe src="${esc(src)}" title="Preview lokasi Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`
-    : '<div class="media-preview-empty">Link Google Maps tidak valid.</div>';
+  if (!src) {
+    box.innerHTML = '<div class="media-preview-empty">Link Google Maps tidak valid.</div>';
+    return;
+  }
+
+  const point = mapPoint(value);
+  const marker = point
+    ? `<span class="map-editor-pin" title="${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}"><i class="fas fa-location-dot"></i></span><span class="map-editor-coords">${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</span>`
+    : "";
+  box.innerHTML = `<div class="map-editor-canvas"><iframe src="${esc(src)}" title="Preview lokasi Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>${marker}</div>`;
 }
 
 function mediaSignature(row) {
@@ -96,6 +96,7 @@ function mediaSignature(row) {
     type: row.querySelector(".v2-media-type")?.value || "image",
     url: row.querySelector(".v2-media-url")?.value?.trim() || "",
     title: row.querySelector(".v2-media-title")?.value?.trim() || "Preview media",
+    aspectRatio: row.querySelector(".v2-media-aspect")?.value || "16:9",
   });
 }
 
@@ -109,59 +110,44 @@ function renderMedia(row) {
 
   const type = row.querySelector(".v2-media-type")?.value || "image";
   const url = row.querySelector(".v2-media-url")?.value?.trim() || "";
-  const title =
-    row.querySelector(".v2-media-title")?.value?.trim() || "Preview media";
+  const title = row.querySelector(".v2-media-title")?.value?.trim() || "Preview media";
+  const aspect = row.querySelector(".v2-media-aspect")?.value || "16:9";
+  box.style.setProperty("--media-aspect", aspect.replace(":", "/"));
 
   if (!url) {
-    box.innerHTML =
-      '<div class="media-preview-empty">Masukkan URL media untuk melihat preview.</div>';
+    box.innerHTML = '<div class="media-preview-empty">Masukkan URL media untuk melihat preview.</div>';
     return;
   }
 
   const safe = safeUrl(url);
   if (!safe) {
-    box.innerHTML =
-      '<div class="media-preview-empty">URL media tidak valid.</div>';
+    box.innerHTML = '<div class="media-preview-empty">URL media tidak valid.</div>';
     return;
   }
 
   if (type === "image") {
-    box.innerHTML = `<img src="${esc(
-      safe.href,
-    )}" alt="${esc(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\"media-preview-empty\">Gambar gagal dimuat dari URL ini.</div>'>`;
+    box.innerHTML = `<img src="${esc(safe.href)}" alt="${esc(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\"media-preview-empty\">Gambar gagal dimuat dari URL ini.</div>'>`;
     return;
   }
 
   if (type === "video") {
-    box.innerHTML = `<video controls preload="metadata" src="${esc(
-      safe.href,
-    )}"></video>`;
+    box.innerHTML = `<video controls preload="metadata" src="${esc(safe.href)}"></video>`;
     return;
   }
 
   if (type === "youtube") {
     const src = yt(safe.href);
-    box.innerHTML = src
-      ? `<iframe src="${esc(
-          src,
-        )}" title="${esc(title)}" loading="lazy" allowfullscreen></iframe>`
-      : '<div class="media-preview-empty">URL YouTube tidak valid.</div>';
+    box.innerHTML = src ? `<iframe src="${esc(src)}" title="${esc(title)}" loading="lazy" allowfullscreen></iframe>` : '<div class="media-preview-empty">URL YouTube tidak valid.</div>';
     return;
   }
 
   if (type === "vimeo") {
     const src = vm(safe.href);
-    box.innerHTML = src
-      ? `<iframe src="${esc(
-          src,
-        )}" title="${esc(title)}" loading="lazy" allowfullscreen></iframe>`
-      : '<div class="media-preview-empty">URL Vimeo tidak valid.</div>';
+    box.innerHTML = src ? `<iframe src="${esc(src)}" title="${esc(title)}" loading="lazy" allowfullscreen></iframe>` : '<div class="media-preview-empty">URL Vimeo tidak valid.</div>';
     return;
   }
 
-  box.innerHTML = `<div class="media-preview-empty"><a href="${esc(
-    safe.href,
-  )}" target="_blank" rel="noopener noreferrer">Buka media</a></div>`;
+  box.innerHTML = `<div class="media-preview-empty"><a href="${esc(safe.href)}" target="_blank" rel="noopener noreferrer">Buka media</a></div>`;
 }
 
 function refreshMedia(root = document) {
@@ -197,13 +183,11 @@ function observe() {
   observer.observe(document.body, { childList: true, subtree: true });
 
   document.addEventListener("input", (event) => {
-    if (event.target.matches?.(".v2-media-url,.v2-media-title,.v2-media-type"))
-      renderMedia(event.target.closest(".v2-media-row"));
+    if (event.target.matches?.(".v2-media-url,.v2-media-title,.v2-media-type,.v2-media-aspect")) renderMedia(event.target.closest(".v2-media-row"));
   });
 
   document.addEventListener("change", (event) => {
-    if (event.target.matches?.(".v2-media-url,.v2-media-type"))
-      renderMedia(event.target.closest(".v2-media-row"));
+    if (event.target.matches?.(".v2-media-url,.v2-media-type,.v2-media-aspect")) renderMedia(event.target.closest(".v2-media-row"));
   });
 
   window.addEventListener("cms:website-draft-updated", () => {
@@ -214,6 +198,5 @@ function observe() {
   });
 }
 
-if (document.readyState === "loading")
-  document.addEventListener("DOMContentLoaded", observe, { once: true });
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", observe, { once: true });
 else observe();
