@@ -22,7 +22,7 @@ function decodeLocalEmulatorToken(idToken) {
   if (projectId && audience && audience !== projectId) throw new Error("INVALID_EMULATOR_AUDIENCE");
   if (Number.isFinite(Number(payload.exp)) && Number(payload.exp) <= now) throw new Error("EXPIRED_EMULATOR_TOKEN");
 
-  return payload;
+  return { ...payload, uid };
 }
 
 async function getAuthenticatedUser(req, res) {
