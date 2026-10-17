@@ -1,7 +1,37 @@
-import "../firebase.js";
 import { renderSite } from "./church-site-renderer.js";
-const root=document.getElementById("church-site"),loading=document.getElementById("site-loading"),errorBox=document.getElementById("site-error");
-const parts=location.pathname.split("/").filter(Boolean),idx=parts.indexOf("church"),slug=idx>=0?decodeURIComponent(parts[idx+1]||""):"",route=parts.length>idx+2?`/${parts.slice(idx+2).join("/")}`:"/";
-async function waitDb(){const start=Date.now();while(!window.db){if(Date.now()-start>10000)throw new Error("FIREBASE_NOT_READY");await new Promise(r=>setTimeout(r,50))}return window.db}
-async function main(){if(!slug)throw new Error("SITE_NOT_FOUND");const db=await waitDb();const slugDoc=await window.firebaseGetDoc(window.firebaseDoc(db,"siteSlugs",slug));if(!slugDoc.exists())throw new Error("SITE_NOT_FOUND");const churchId=slugDoc.data().churchId;if(!churchId)throw new Error("SITE_INVALID");const [configDoc,navDoc,pagesSnap,eventsSnap,ministriesSnap]=await Promise.all([window.firebaseGetDoc(window.firebaseDoc(db,"publicSites",churchId,"config","site")),window.firebaseGetDoc(window.firebaseDoc(db,"publicSites",churchId,"navigation","main")),window.firebaseGetDocs(window.firebaseCollection(db,"publicSites",churchId,"pages")),window.firebaseGetDocs(window.firebaseCollection(db,"publicSites",churchId,"events")),window.firebaseGetDocs(window.firebaseCollection(db,"publicSites",churchId,"ministries"))]);if(!configDoc.exists()||configDoc.data().enabled===false)throw new Error("SITE_UNPUBLISHED");const config=configDoc.data(),navigation={items:navDoc.exists()?navDoc.data().items||[]:[]},pages=pagesSnap.docs.map(d=>({id:d.id,...d.data()})),page=pages.find(p=>String(p.slug||"/")===route);if(!page)throw new Error("PAGE_NOT_FOUND");const events=eventsSnap.docs.map(d=>({id:d.id,...d.data()})),ministries=ministriesSnap.docs.map(d=>({id:d.id,...d.data()}));renderSite({root,config,navigation,page,events,ministries,slug});loading?.classList.add("hidden");root?.classList.remove("hidden")}
-main().catch(err=>{console.error("[PUBLIC WEBSITE]",err);loading?.classList.add("hidden");errorBox?.classList.remove("hidden")});
+
+const root = document.getElementById("church-site");
+const loading = document.getElementById("site-loading");
+const errorBox = document.getElementById("site-error");
+const parts = location.pathname.split("/").filter(Boolean);
+const idx = parts.indexOf("church");
+const slug = idx >= 0 ? decodeURIComponent(parts[idx + 1] || "") : "";
+const route = parts.length > idx + 2 ? `/${parts.slice(idx + 2).join("/")}` : "/";
+
+async function main() {
+  if (!slug) throw new Error("SITE_NOT_FOUND");
+  const response = await fetch(`/api/public/church-site?slug=${encodeURIComponent(slug)}&route=${encodeURIComponent(route)}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.success === false) throw new Error(result.message || `HTTP ${response.status}`);
+  const data = result.data || {};
+  renderSite({
+    root,
+    config: data.config || {},
+    navigation: data.navigation || { items: [] },
+    page: data.page || {},
+    events: data.events || [],
+    ministries: data.ministries || [],
+    slug: data.slug || slug,
+  });
+  loading?.classList.add("hidden");
+  root?.classList.remove("hidden");
+}
+
+main().catch((err) => {
+  console.error("[PUBLIC WEBSITE] Error:", err);
+  loading?.classList.add("hidden");
+  errorBox?.classList.remove("hidden");
+});
