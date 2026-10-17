@@ -1,4 +1,4 @@
-const { auth, db } = require("./firebase-admin");
+const { auth } = require("./firebase-admin");
 const { requireAppCheck } = require("./app-check");
 const { supabaseAdmin } = require("./supabase");
 
@@ -13,14 +13,19 @@ async function getAuthenticatedUser(req, res) {
   catch (error) { console.error("[AUTH] verifyIdToken gagal:", { name: error?.name || null, code: error?.code || null, message: error?.message || "Unknown auth error" }); res.status(401).json({ success: false, message: "Token autentikasi tidak valid atau sudah kedaluwarsa." }); return null; }
 
   try {
-    // Local emulator users are intentionally not migrated into the live Supabase auth mapping.
-    // Resolve them before touching Supabase so local startup cannot stall on a production mapping query.
+    // Local emulator auth is intentionally self-contained. Do not make an extra
+    // Firestore request here: the admin API only needs the deterministic dev
+    // identity to resolve the same tenant in Supabase.
     if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
-      const userSnap = await db.collection("users").doc(decoded.uid).get();
-      if (!userSnap.exists) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
-      const userData = userSnap.data() || {};
-      if (userData.uid !== decoded.uid || !userData.churchId) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
-      return { uid: decoded.uid, authUserId: null, email: decoded.email || userData.email || null, role: userData.role, churchId: userData.churchId };
+      const expectedUid = process.env.DEV_FIREBASE_UID || "local-cms-superadmin-001";
+      const churchId = process.env.DEV_CHURCH_ID || "JhSB69TxbhTLKLUlR9VR";
+      const role = process.env.DEV_FIREBASE_ROLE || "superadmin";
+      const email = process.env.DEV_FIREBASE_EMAIL || decoded.email || null;
+      if (decoded.uid !== expectedUid || !churchId) {
+        res.status(403).json({ success: false, message: "Profil user tidak ditemukan" });
+        return null;
+      }
+      return { uid: decoded.uid, authUserId: null, email, role, churchId };
     }
 
     const { data: mapping, error: mappingError } = await supabaseAdmin.from("firebase_uid_map").select("auth_user_id").eq("legacy_uid", decoded.uid).maybeSingle();
