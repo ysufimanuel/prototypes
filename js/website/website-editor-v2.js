@@ -8,15 +8,9 @@ let editing = null;
 let initialized = false;
 let saving = false;
 
-const esc = (value) => String(value ?? "").replace(/[&<>\"']/g, (char) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
-}[char]));
+const esc = (value) => String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]));
 
-async function withTimeout(promise, timeoutMs, message) {
-  let timer;
-  try { return await Promise.race([promise, new Promise((_, reject) => { timer = window.setTimeout(() => reject(new Error(message)), timeoutMs); })]); }
-  finally { window.clearTimeout(timer); }
-}
+async function withTimeout(promise, timeoutMs, message) { let timer; try { return await Promise.race([promise, new Promise((_, reject) => { timer = window.setTimeout(() => reject(new Error(message)), timeoutMs); })]); } finally { window.clearTimeout(timer); } }
 async function getToken() { if (!user) throw new Error("AUTH_REQUIRED"); return withTimeout(user.getIdToken(), 15000, "Firebase ID token terlalu lama dimuat. Silakan refresh halaman."); }
 async function api(path, options = {}) {
   const token = await getToken(); const controller = new AbortController(); const timer = window.setTimeout(() => controller.abort(), 30000);
@@ -29,16 +23,10 @@ async function api(path, options = {}) {
   finally { window.clearTimeout(timer); }
 }
 async function loadDraft() {
-  if (window.__cmsWebsiteDraft?.pages?.length) {
-    draft = window.__cmsWebsiteDraft;
-    draft.content = draft.content || { events: [], ministries: [] };
-    return draft;
-  }
+  if (window.__cmsWebsiteDraft?.pages?.length) { draft = window.__cmsWebsiteDraft; draft.content = draft.content || { events: [], ministries: [] }; return draft; }
   const data = await api("/draft", { method: "GET" });
   draft = data.data || { config: {}, navigation: { items: [] }, pages: [], content: { events: [], ministries: [] } };
-  draft.content = draft.content || { events: [], ministries: [] };
-  window.__cmsWebsiteDraft = draft;
-  return draft;
+  draft.content = draft.content || { events: [], ministries: [] }; window.__cmsWebsiteDraft = draft; return draft;
 }
 
 const ASPECT_RATIOS = ["19:9", "1:1", "4:3", "4:5", "2:3", "9:16", "21:9", "32:9"];
@@ -69,13 +57,16 @@ function readEditor() {
 async function savePage() {
   if (!editing || saving) return; saving = true;
   try {
-    const pages = (draft?.pages || []).map((page) => page.id === editing.id ? { ...page, title: $("v2-page-title")?.value?.trim() || page.title, slug: $("v2-page-slug")?.value?.trim() || page.slug || "/", published: $("v2-page-published")?.checked !== false, sections: readEditor() } : page);
+    const page = { ...editing, title: $("v2-page-title")?.value?.trim() || editing.title, slug: $("v2-page-slug")?.value?.trim() || editing.slug || "/", published: $("v2-page-published")?.checked !== false, sections: readEditor() };
     const token = await getToken(); const controller = new AbortController(); const timer = window.setTimeout(() => controller.abort(), 30000);
     try {
-      const response = await fetch(API + "/draft", { method: "PUT", signal: controller.signal, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ pages }) });
+      const response = await fetch(API + "/page", { method: "PUT", signal: controller.signal, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ page }) });
       const data = await response.json().catch(() => ({})); if (!response.ok || data.success === false) throw new Error(data.message || `HTTP ${response.status}`);
-    } finally { window.clearTimeout(timer); }
-    draft.pages = pages; window.__cmsWebsiteDraft = draft; window.dispatchEvent(new CustomEvent("cms:website-draft-updated", { detail: draft })); closeEditor();
+    } catch (error) { if (error?.name === "AbortError") throw new Error("Simpan page terlalu lama (lebih dari 30 detik)."); throw error; }
+    finally { window.clearTimeout(timer); }
+    const index = (draft?.pages || []).findIndex((item) => item.id === page.id);
+    if (index >= 0) draft.pages[index] = page; else draft.pages.push(page);
+    window.__cmsWebsiteDraft = draft; window.dispatchEvent(new CustomEvent("cms:website-draft-updated", { detail: draft })); closeEditor();
   } finally { saving = false; }
 }
 function openEditor(pageId) { const page = (draft?.pages || []).find((item) => item.id === pageId); if (!page) return; editing = JSON.parse(JSON.stringify(page)); renderEditor(); }
