@@ -1,6 +1,7 @@
 import "../firebase.js";
 
 const API = "/api/admin/website";
+const PUBLISH_API = "/api/admin/website/publish-supabase";
 let publishing = false;
 
 async function withTimeout(promise, timeoutMs, message) {
@@ -18,15 +19,11 @@ async function withTimeout(promise, timeoutMs, message) {
 }
 
 async function api(user, path, options = {}) {
-  const token = await withTimeout(
-    user.getIdToken(),
-    15000,
-    "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.",
-  );
+  const token = await withTimeout(user.getIdToken(), 15000, "Firebase ID token terlalu lama dimuat. Silakan refresh halaman.");
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch(API + path, {
+    const response = await fetch(path, {
       ...options,
       signal: controller.signal,
       headers: {
@@ -36,14 +33,10 @@ async function api(user, path, options = {}) {
       },
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.success === false) {
-      throw new Error(data.message || `HTTP ${response.status}`);
-    }
+    if (!response.ok || data.success === false) throw new Error(data.message || `HTTP ${response.status}`);
     return data;
   } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error(`Request ${path} terlalu lama (lebih dari 30 detik).`);
-    }
+    if (error?.name === "AbortError") throw new Error(`Request ${path} terlalu lama (lebih dari 30 detik).`);
     throw error;
   } finally {
     window.clearTimeout(timer);
@@ -51,8 +44,7 @@ async function api(user, path, options = {}) {
 }
 
 async function publish(user) {
-  await api(user, "/publish", { method: "POST", body: "{}" });
-  await api(user, "/publish-content", { method: "POST", body: "{}" });
+  await api(user, PUBLISH_API, { method: "POST", body: "{}" });
   window.dispatchEvent(new CustomEvent("cms:website-draft-updated"));
 }
 
@@ -76,7 +68,7 @@ function init() {
 
     try {
       await publish(user);
-      alert("Website dan data Event/Ministries berhasil dipublikasikan.");
+      alert("Website berhasil dipublikasikan dari Supabase.");
     } catch (error) {
       console.error("[WEBSITE PUBLISH FIX]", error);
       alert(error.message || "Gagal mempublikasikan website.");
