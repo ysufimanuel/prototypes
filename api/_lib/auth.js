@@ -13,6 +13,16 @@ async function getAuthenticatedUser(req, res) {
   catch (error) { console.error("[AUTH] verifyIdToken gagal:", { name: error?.name || null, code: error?.code || null, message: error?.message || "Unknown auth error" }); res.status(401).json({ success: false, message: "Token autentikasi tidak valid atau sudah kedaluwarsa." }); return null; }
 
   try {
+    // Local emulator users are intentionally not migrated into the live Supabase auth mapping.
+    // Resolve them before touching Supabase so local startup cannot stall on a production mapping query.
+    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+      const userSnap = await db.collection("users").doc(decoded.uid).get();
+      if (!userSnap.exists) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
+      const userData = userSnap.data() || {};
+      if (userData.uid !== decoded.uid || !userData.churchId) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
+      return { uid: decoded.uid, authUserId: null, email: decoded.email || userData.email || null, role: userData.role, churchId: userData.churchId };
+    }
+
     const { data: mapping, error: mappingError } = await supabaseAdmin.from("firebase_uid_map").select("auth_user_id").eq("legacy_uid", decoded.uid).maybeSingle();
     if (mappingError) throw mappingError;
 
@@ -26,16 +36,6 @@ async function getAuthenticatedUser(req, res) {
       if (!church?.legacy_id) { res.status(403).json({ success: false, message: "User belum memiliki church" }); return null; }
 
       return { uid: decoded.uid, authUserId: profile.id, email: decoded.email || profile.email || null, role: profile.role, churchId: church.legacy_id };
-    }
-
-    // Local Firebase emulator users are intentionally not migrated into the live Supabase auth mapping.
-    // Keep local development deterministic without weakening the deployed authentication path.
-    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
-      const userSnap = await db.collection("users").doc(decoded.uid).get();
-      if (!userSnap.exists) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
-      const userData = userSnap.data() || {};
-      if (userData.uid !== decoded.uid || !userData.churchId) { res.status(403).json({ success: false, message: "Profil user tidak ditemukan" }); return null; }
-      return { uid: decoded.uid, authUserId: null, email: decoded.email || userData.email || null, role: userData.role, churchId: userData.churchId };
     }
 
     res.status(403).json({ success: false, message: "Profil user tidak ditemukan" });
