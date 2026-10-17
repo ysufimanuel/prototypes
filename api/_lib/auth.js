@@ -1,21 +1,18 @@
-const { auth, db } = require("./firebase-admin");
+const { auth } = require("./firebase-admin");
 const { requireAppCheck } = require("./app-check");
+const { supabaseAdmin } = require("./supabase");
 
 async function getAuthenticatedUser(req, res) {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
-    res
-      .status(401)
-      .json({ success: false, message: "Token autentikasi tidak ditemukan" });
+    res.status(401).json({ success: false, message: "Token autentikasi tidak ditemukan" });
     return null;
   }
 
   const idToken = authHeader.substring(7).trim();
   if (!idToken) {
-    res
-      .status(401)
-      .json({ success: false, message: "Token autentikasi kosong" });
+    res.status(401).json({ success: false, message: "Token autentikasi kosong" });
     return null;
   }
 
@@ -35,14 +32,55 @@ async function getAuthenticatedUser(req, res) {
     return null;
   }
 
-  let userSnap;
   try {
-    userSnap = await db.collection("users").doc(decoded.uid).get();
+    const { data: mapping, error: mappingError } = await supabaseAdmin
+      .from("firebase_uid_map")
+      .select("auth_user_id")
+      .eq("legacy_uid", decoded.uid)
+      .maybeSingle();
+
+    if (mappingError) throw mappingError;
+    if (!mapping?.auth_user_id) {
+      res.status(403).json({ success: false, message: "Profil user tidak ditemukan" });
+      return null;
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, church_id, role, email, nama, status")
+      .eq("id", mapping.auth_user_id)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!profile) {
+      res.status(403).json({ success: false, message: "Profil user tidak ditemukan" });
+      return null;
+    }
+
+    const { data: church, error: churchError } = await supabaseAdmin
+      .from("churches")
+      .select("legacy_id")
+      .eq("id", profile.church_id)
+      .maybeSingle();
+
+    if (churchError) throw churchError;
+    if (!church?.legacy_id) {
+      res.status(403).json({ success: false, message: "User belum memiliki church" });
+      return null;
+    }
+
+    return {
+      uid: decoded.uid,
+      authUserId: profile.id,
+      email: decoded.email || profile.email || null,
+      role: profile.role,
+      churchId: church.legacy_id,
+    };
   } catch (error) {
-    console.error("[AUTH] Firestore users lookup gagal:", {
+    console.error("[AUTH] Supabase profile lookup gagal:", {
       name: error?.name || null,
       code: error?.code || null,
-      message: error?.message || "Unknown Firestore error",
+      message: error?.message || "Unknown Supabase error",
     });
     res.status(500).json({
       success: false,
@@ -50,27 +88,6 @@ async function getAuthenticatedUser(req, res) {
     });
     return null;
   }
-
-  if (!userSnap.exists) {
-    res
-      .status(403)
-      .json({ success: false, message: "Profil user tidak ditemukan" });
-    return null;
-  }
-
-  const userData = userSnap.data();
-
-  if (userData.uid !== decoded.uid) {
-    res.status(403).json({ success: false, message: "UID user tidak cocok" });
-    return null;
-  }
-
-  return {
-    uid: decoded.uid,
-    email: decoded.email || null,
-    role: userData.role,
-    churchId: userData.churchId,
-  };
 }
 
 async function requireChurchAdmin(req, res) {
@@ -85,9 +102,10 @@ async function requireChurchAdmin(req, res) {
     return null;
   }
   if (!user.churchId) {
-    res
-      .status(403)
-      .json({ success: false, message: "User belum memiliki church" });
+    res.status(403).json({
+      success: false,
+      message: "User belum memiliki church",
+    });
     return null;
   }
   return user;
@@ -98,15 +116,17 @@ async function requireSuperAdmin(req, res) {
   const user = await getAuthenticatedUser(req, res);
   if (!user) return null;
   if (user.role !== "superadmin") {
-    res
-      .status(403)
-      .json({ success: false, message: "Akses hanya untuk Superadmin" });
+    res.status(403).json({
+      success: false,
+      message: "Akses hanya untuk Superadmin",
+    });
     return null;
   }
   if (!user.churchId) {
-    res
-      .status(403)
-      .json({ success: false, message: "User belum memiliki church" });
+    res.status(403).json({
+      success: false,
+      message: "User belum memiliki church",
+    });
     return null;
   }
   return user;
