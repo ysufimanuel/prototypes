@@ -259,16 +259,19 @@ async function saveDraft(req, res, user) {
 }
 
 module.exports = async function handler(req, res) {
-  if (applyCors(req, res)) return;
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (!["GET", "PUT"].includes(req.method)) return res.status(405).json({ success: false, message: "Method tidak diizinkan" });
+  applyCors(req, res);
+  if (!["GET", "PUT"].includes(req.method)) {
+    return res.status(405).json({ success: false, message: "Method Not Allowed" });
+  }
+
   const user = await requireChurchAdmin(req, res);
   if (!user) return;
+
   try {
     if (req.method === "GET") return await getDraft(req, res, user);
     return await saveDraft(req, res, user);
   } catch (error) {
-    console.error("[WEBSITE DRAFT API] Internal error:", { name: error?.name || null, message: error?.message || String(error) });
-    return res.status(500).json({ success: false, message: error?.message || "Gagal memproses draft website." });
+    console.error("[WEBSITE DRAFT] request failed:", error);
+    return res.status(500).json({ success: false, message: "WEBSITE_DRAFT_FAILED" });
   }
 };
