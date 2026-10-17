@@ -2,6 +2,29 @@ const { auth } = require("./firebase-admin");
 const { requireAppCheck } = require("./app-check");
 const { supabaseAdmin } = require("./supabase");
 
+function decodeLocalEmulatorToken(idToken) {
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) throw new Error("INVALID_EMULATOR_TOKEN");
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  } catch {
+    throw new Error("INVALID_EMULATOR_TOKEN");
+  }
+
+  const uid = String(payload.user_id || payload.sub || "").trim();
+  const projectId = String(process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || "").trim();
+  const audience = String(payload.aud || "").trim();
+  const now = Math.floor(Date.now() / 1000);
+
+  if (!uid) throw new Error("INVALID_EMULATOR_TOKEN");
+  if (projectId && audience && audience !== projectId) throw new Error("INVALID_EMULATOR_AUDIENCE");
+  if (Number.isFinite(Number(payload.exp)) && Number(payload.exp) <= now) throw new Error("EXPIRED_EMULATOR_TOKEN");
+
+  return payload;
+}
+
 async function getAuthenticatedUser(req, res) {
   const authHeader = req.headers.authorization || "";
   if (!authHeader.startsWith("Bearer ")) { res.status(401).json({ success: false, message: "Token autentikasi tidak ditemukan" }); return null; }
@@ -9,7 +32,16 @@ async function getAuthenticatedUser(req, res) {
   if (!idToken) { res.status(401).json({ success: false, message: "Token autentikasi kosong" }); return null; }
 
   let decoded;
-  try { decoded = await auth.verifyIdToken(idToken); }
+  try {
+    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+      // Emulator ID tokens are intentionally unsigned. Decode and validate the
+      // local token shape/claims here instead of making the Admin SDK perform
+      // a network-backed verification step that can block local Vercel dev.
+      decoded = decodeLocalEmulatorToken(idToken);
+    } else {
+      decoded = await auth.verifyIdToken(idToken);
+    }
+  }
   catch (error) { console.error("[AUTH] verifyIdToken gagal:", { name: error?.name || null, code: error?.code || null, message: error?.message || "Unknown auth error" }); res.status(401).json({ success: false, message: "Token autentikasi tidak valid atau sudah kedaluwarsa." }); return null; }
 
   try {
